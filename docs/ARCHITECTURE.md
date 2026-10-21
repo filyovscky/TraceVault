@@ -1,0 +1,42 @@
+# TraceVault: архитектура v1
+
+Решение принято до реализации 22.10.2026. Полный входной документ: SPECIFICATION_RU.md.
+
+## Границы компонентов
+
+- `background.js`: MV3 worker; контекстное меню, команды, открытие панели, персистентный почтовый ящик команд. Не владеет файлами/долгими операциями.
+- `panel.html`/`panel.js`: одинаковое приложение в Side Panel и отдельной вкладке. Выбор каталога только по жесту. Закрытие страницы прерывает операцию; журнал позволяет обнаружить это.
+- `content.js`: изолированный мир, селекторы текста, CSS Custom Highlight, компактный Shadow DOM toolbar. Текстовые узлы оригинала не изменяются.
+- `capture.js`: независимый best-effort архиватор, сериализует текущий DOM; встраивает ресурсы, удаляет активное содержимое, добавляет запрещающую сетевые обращения CSP. Недоступные ресурсы перечисляет.
+- `storage.js`: FSA + IndexedDB handle, чтение после записи, SHA-256; Web Locks для единственного writer между вкладкой и панелью.
+- `repository.js`: неизменяемые файлы событий, восстановление состояния свёрткой. Первичный источник — диск. Индексы вычисляемые.
+- `domain.js`: часы, нормализация, якоря, экспорт. Никаких запросов к сервису продукта.
+
+## Дисковый контракт
+
+`workspace.json`: schema_version, workspace_id. `cases/<UUID>/case.json`: case_id, code, title, created_at. `cases/<UUID>/events/<UUID>.json`: версии записей и аудит; каждый файл пишется один раз. `captures/<capture_id>.html`, `screenshots/<capture_id>.png`, `attachments/<capture_id>.<ext>`, `exports/<UUID>.json` внутри дела. Все пути относительные; сегменты проверяются. Нет папки ресурсов рядом с HTML.
+
+Журнал неизменяем на уровне приложения, не криптографически защищён. Отдельный файл события уменьшает область повреждения при сбое. Файл закрывается и перечитывается перед публикацией события завершения. Некорректный JSON события не игнорируется: диагностика и запрет дальнейших изменений до устранения. Незавершённый capture помечается interrupted при получении writer lock после повторного открытия. Файлы, записанные до сбоя, остаются для ручной проверки; автоматического объявления completed нет. Новые версии имеют новые UUID, ссылки старых Entity не перепривязываются.
+
+## Обмен сообщениями
+
+Worker → chrome.storage.local inbox: `{id, action, tabId, selectionText?, imageUrl?, created_at}`. UI забирает команды под Web Lock, удаляет после регистрации на диске; идентификатор capture совпадает с id команды. Повторная доставка существующего ID безопасна. Пользовательская повторная фиксация создаёт новый ID.
+
+UI → content: `TV_SELECTION`, `TV_RENDER` (только аннотации текущего URL/дела), `TV_HIDE`, `TV_SCROLL`. Content → worker: `TV_ACTION`; sender.tab определяет источник. Content scripts не получают FileSystemHandle. Дополнительный доступ к домену запрашивается явно и позволяет восстановление после навигации/перезапуска. Скрытие аннотаций распространяется на открытые вкладки.
+
+Операция фиксирует case_id и tabId до первого await захвата. Перед/после получения DOM/скриншота проверяются URL и активная вкладка; изменение приводит к ошибке. Запись файлов сериализована; длительная операция держится в документе, а не в worker.
+
+## Безопасность
+
+Только http(s); incognito отклоняется. activeTab, scripting, storage, contextMenus, sidePanel; optional host permissions по домену. Без debugger, downloads, nativeMessaging, telemetry. Архивы удаляют скрипты, обработчики, формы submit, refresh, embed/object; CSP default-src none, inline styles/data images/fonts, sandbox. Просмотр в iframe sandbox без allow-scripts/allow-same-origin. Пароли и значения редактируемых полей не фиксируются. Авторизованные страницы всё равно могут содержать чувствительный видимый текст.
+
+## Очерёдность и критерии
+
+0. Исследование/API: реальная запись/перечитывание FSA, сохранение handle, три HTML fixture, лицензии. Результаты отдельно от предположений документации.
+1. P0: папка, дела, архивы/PNG, метаданные/хеш, аннотации/Entity, поиск/экспорт, восстановление. Все AC из ТЗ отражаются в TEST-REPORT.md.
+2. Тесты реального Chromium, офлайн/файлы, ошибки, визуальные снимки обоих цветов и размеров. Исправления до дополнительных функций.
+3. P1/P2 после закрытия P0. Native bridge/OSINTchart importer — отдельный этап с реальными моделями и preview.
+
+## Источники проверки
+
+Chrome: https://developer.chrome.com/docs/capabilities/web-apis/file-system-access/ ; https://developer.chrome.com/docs/extensions/reference/api/sidePanel ; https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle ; https://developer.chrome.com/docs/extensions/reference/api/tabs . Документация не заменяет браузерный тест.
