@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "TraceVault",
+  "version": "0.1.0",
+  "description": "Локальная фиксация веб-материалов с SHA-256, аннотациями и источниками Entity.",
+  "minimum_chrome_version": "120",
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "sidePanel"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "action": {"default_title": "Открыть TraceVault"},
+  "side_panel": {"default_path": "panel.html"},
+  "options_page": "panel.html?workspace=1",
+  "commands": {
+    "capture-page": {"suggested_key": {"default": "Alt+Shift+S"}, "description": "Сохранить страницу"},
+    "capture-screen": {"suggested_key": {"default": "Alt+Shift+P"}, "description": "Скриншот видимой области"},
+    "open-panel": {"suggested_key": {"default": "Alt+Shift+V"}, "description": "Открыть панель"},
+    "add-highlight": {"description": "Сохранить выделение"}
+  },
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'; frame-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"}
+}
