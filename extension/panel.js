@@ -116,7 +116,13 @@ async function beginAnnotation(actionName,command=null) {
   const sel=data?.selection;
   if(actionName!=='manual' && !sel?.exact) throw new Error("Select page text outside input fields and editors");
   if(command?.selectionText && sel.exact!==command.selectionText) throw new Error("The selection changed after opening the menu. Select the text again.");
-  if(command?.selectionDigest && await sha256(new TextEncoder().encode(sel.exact))!==command.selectionDigest)throw new Error("The selection changed after opening the menu. Select the text again.");
+  if(command?.selectionDigest && await sha256(new TextEncoder().encode(data.native_text ?? sel.exact))!==command.selectionDigest)throw new Error("The selection changed after opening the menu. Select the text again.");
+  if(actionName==='highlight'){
+    if(busy)throw new Error('Wait for the current operation');if(data.url!==requested.url)throw new Error('The source URL changed. Select the text again.');
+    busy=true;setBusy(true);
+    try{const annotation=await saveAnnotation({...c,tabId:sourceId,selection:sel,type:'text_highlight',note:''});await refresh();await refreshSource();if(c.caseId===activeCase)showAnnotation(annotation.annotation_id);status('Highlight saved. Use Edit to add an optional note.');await chrome.tabs.sendMessage(sourceId,{type:'TV_FEEDBACK',message:'Highlight saved. You can add a note in TraceVault.'}).catch(()=>{});return annotation;}
+    finally{busy=false;setBusy(false);queueMicrotask(()=>processInbox().catch(reportError));}
+  }
   pending={...c,tabId:actionName==='manual'?null:sourceId,selection:actionName==='manual'?null:sel,action:actionName,captureId:null,annotationId:null,sourceUrl:data?.url};
   $('annotation-title').textContent=actionName==='entity'?"Create entity":actionName==='manual'?"Free note":"Save selection";
   $('quote-preview').textContent=pending.selection?.exact || "Note without a quote";
@@ -249,17 +255,26 @@ async function processInbox() {
       // A durable receipt prevents reprocessing a selection command after a crash.
       const prior=await exclusive(()=>loadState(root,workspace,receiptCase));
       if(prior.audit.some(e=>e.action==='command_received' && e.details.command_id===command.id)){
-        if(!prior.captures[command.id]){await exclusive(()=>append(root,workspace,receiptCase,'command_interrupted',null,null,{command_id:command.id,reason:"Interrupted before an evidence record was created. Repeat the action explicitly."}));status("Command interrupted before the evidence record. Repeat the action.",true);}
+        if(!prior.captures[command.id] && !prior.audit.some(e=>e.action==='command_completed' && e.details.command_id===command.id)){await exclusive(()=>append(root,workspace,receiptCase,'command_interrupted',null,null,{command_id:command.id,reason:"Interrupted before an evidence record was created. Repeat the action explicitly."}));status("Command interrupted before the evidence record. Repeat the action.",true);}
         await chrome.storage.local.remove(key);continue;
       }
       await exclusive(()=>append(root,workspace,receiptCase,'command_received',null,null,{command_id:command.id,session:sessionId}));
-      try {if(['page','screen','image'].includes(command.action))await runCapture(command.action,command);else await beginAnnotation(command.action,command);}
-      catch(e){status(errorText(e),true);await exclusive(()=>append(root,workspace,receiptCase,'command_failed',null,null,{command_id:command.id,error:errorText(e)}));}
+      try {if(['page','screen','image'].includes(command.action))await runCapture(command.action,command);else if(['delete-highlight','edit-highlight'].includes(command.action))await contextHighlight(command);else await beginAnnotation(command.action,command);await exclusive(()=>append(root,workspace,receiptCase,'command_completed',null,null,{command_id:command.id}));}
+      catch(e){status(errorText(e),true);await chrome.tabs.sendMessage(command.tabId,{type:'TV_FEEDBACK',message:errorText(e),error:true}).catch(()=>{});await exclusive(()=>append(root,workspace,receiptCase,'command_failed',null,null,{command_id:command.id,error:errorText(e)}));}
       finally{await chrome.storage.local.remove(key);}
     }
     return true;
   });
   if(drained && !busy && !$('annotation-dialog').open){const values=await chrome.storage.local.get(null);if(Object.entries(values).some(([k,c])=>k.startsWith('command:') && (!c.workspaceId || c.workspaceId===workspace.workspace_id)))queueMicrotask(()=>processInbox().catch(e=>status(errorText(e),true)));}
+}
+async function contextHighlight(command){
+  await canWrite();if(!command.annotationId)throw new Error('Right-click a visible TraceVault highlight to use this action.');
+  const source=await chrome.tabs.get(command.tabId);if(source.url!==command.sourceUrl || source.url!==command.contextUrl)throw new Error('The source changed after opening the context menu.');
+  const c={...context(),caseId:command.caseId},fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId)),a=fresh.annotations[command.annotationId];
+  if(!a || a.deleted || a.type!=='text_highlight' || a.source_url!==source.url)throw new Error('This highlight is no longer available in its original case.');
+  if(command.action==='edit-highlight'){editAnnotation(a);return;}
+  await updateAnnotation(c.root,c.workspace,c.caseId,a.annotation_id,{deleted:true});lastDeleted={...c,id:a.annotation_id};$('undo-delete').hidden=false;await refresh();await refreshSource();$('details').hidden=true;status('Highlight deleted. Undo is available.');
+  await chrome.tabs.sendMessage(command.tabId,{type:'TV_FEEDBACK',message:'Highlight deleted. Undo is available in TraceVault.'}).catch(()=>{});
 }
 action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle,$('workspace-mode').value);status("Folder access verified by writing and reading a test file");});
 action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle);status("Workspace connected");});

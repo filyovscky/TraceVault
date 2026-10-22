@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — fixed headers and direct highlights, 22.10.2026
+
+- Full-page capture shows viewport-fixed roots once and returns sticky nodes to their natural flow temporarily. Overlap-safe source-pixel patches preserve the single header/footer occurrence. Capture method v2 records frame crop rectangles, visible/hidden roots, normalization and restoration results; existing evidence is untouched.
+- Styles/priorities and scroll restore after success, cancellation and failure. Unrelated site style updates survive. Fixed descendants of scrolling transformed containers are excluded. A document-scoped lease releases temporary styles if the capture document stops responding.
+- Highlight selection now writes immediately with an optional empty note, without an editor. Right-click a visible highlight to edit its note or delete it; deletion is reversible through Undo. Hit testing uses actual CSS Highlight ranges and pointer coordinates, without inserting spans into source text.
+- Successful command receipts prevent duplicate delivery from repeating automatic annotation actions. Native selection text is used for the menu-selection digest, preserving multi-paragraph highlights with rendered line breaks.
+- On-page success feedback follows verified writes and is hidden during captures. No new permissions or runtime dependencies.
+
 ## 0.4.0 — English icon interface, 22.10.2026
 
 - All shipped interface text, runtime errors/progress, context menus, command descriptions and citation labels are English. Source content, user data, existing originals and historical journal entries are preserved.

@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.4.0](releases/TraceVault-0.4.0.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.4.1](releases/TraceVault-0.4.1.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.0. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.1. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Use the **folder** icon to choose a workspace. The extension verifies access with a real write/read/delete probe. Choose an empty folder or an existing TraceVault workspace. Create a case using its code and title.
 
@@ -54,11 +54,11 @@ There are **no excluded-domain lists**. Incognito capture and the pause setting 
 
 HTML capture uses our DOM/inline-resource engine. Password and editable-field values are cleared; visible personal data can still be included. Offline archives use a strict CSP and sandboxed preview. Cross-origin frames, DRM/video/WebGL, closed shadow DOM, virtualized lists and complex authenticated applications remain best effort; diagnostics record incompleteness.
 
-Full PNG scrolls both axes, keeps original frames and their coordinates/timestamps/SHA-256, stitches a PNG and restores scroll/overlays. Capture stops if the URL, active tab, zoom or geometry changes. Limits: 24 million pixels, 30000 px per side, 64 frames, configurable byte limit (64 MB default). Fixed elements may repeat; sequential capture is not an atomic snapshot in time.
+Full PNG scrolls both axes, keeps original frames and their coordinates/timestamps/SHA-256, stitches a PNG and restores scroll/overlays. Capture stops if the URL, active tab, zoom or geometry changes. Limits: 24 million pixels, 30000 px per side, 64 frames, configurable byte limit (64 MB default). Viewport-fixed roots are shown once at a selected edge tile; sticky elements are temporarily returned to their natural flow. Source/destination crop rectangles and normalization details are recorded, and styles/scroll are restored. Closed shadow roots, nested frames, newly appearing overlays and complex transformed/overflowing elements are not universally normalized. Sequential capture is not an atomic snapshot in time.
 
 PDF is a lossless raster A4 derivative of a verified PNG, without OCR or HTML reflow. It has its own SHA-256 and source derivation. Open it from the workspace in an external viewer; blob-PDF preview is not supported by the extension's strict CSP.
 
-Annotations use CSS Highlights, without rewriting page text or saved originals. An unarchived reference is marked **Live page only**. Use the archive-and-link icon in the editor to bind a quote to a verified HTML capture. Edits, hide and undo are journal events; existing evidence references remain pinned to their original version.
+Highlight selection saves immediately without opening an editor; the note is optional. Right-click a visible highlight and use **Edit highlight note** or **Delete highlight here**. Deletion is a reversible journal update; use Undo in TraceVault to restore it. A right-click outside a highlight returns a clear error. Annotations use CSS Highlights, without rewriting page text or saved originals. An unarchived reference is marked **Live page only**. Use the archive-and-link icon in the editor to bind a quote to a verified HTML capture. Edits, hide and undo are journal events; existing evidence references remain pinned to their original version.
 
 ## OSINTchart and build
 

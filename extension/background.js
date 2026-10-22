@@ -1,25 +1,14 @@
-import {sha256} from './domain.js';
-const menus={quote:"Save selected text",highlight:"Highlight selection",entity:"Create entity from selection",note:"Add note to selection",image:"Save image"};
+import {enqueue,handleContextMenu} from './context-actions.js';
+const menus={quote:"Save selected text",highlight:"Highlight selection",entity:"Create entity from selection",note:"Add note to selection",image:"Save image",'edit-highlight':'Edit highlight note','delete-highlight':'Delete highlight here'};
 chrome.runtime.onInstalled.addListener(async()=>{
   await chrome.contextMenus.removeAll();
-  for(const [id,title] of Object.entries(menus)) chrome.contextMenus.create({id,title,contexts:[id==='image'?'image':'selection'],documentUrlPatterns:['http://*/*','https://*/*']});
+  for(const [id,title] of Object.entries(menus)) chrome.contextMenus.create({id,title,contexts:id.endsWith('-highlight')?['all']:[id==='image'?'image':'selection'],documentUrlPatterns:['http://*/*','https://*/*']});
   await chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:false});
 });
 // A real action invocation grants activeTab, unlike a click inside an already
 // open side panel. Keep opening in this synchronous user-gesture handler.
 chrome.action.onClicked.addListener(tab=>{chrome.sidePanel.open({tabId:tab.id}).catch(console.error);});
-async function enqueue(action,tab,extra={}) {
-  if(!tab?.id) return;
-  const {activeCase,activeContext}=await chrome.storage.local.get(['activeCase','activeContext']);
-  const {selectionText,...details}=extra;
-  const command={id:crypto.randomUUID(),action,tabId:tab.id,caseId:activeCase || null,workspaceId:activeContext?.workspaceId || null,sourceUrl:tab.url,created_at:new Date().toISOString(),selectionDigest:selectionText?await sha256(new TextEncoder().encode(selectionText)):null,...details};
-  await chrome.storage.local.set({['command:'+command.id]:command});
-}
-chrome.contextMenus.onClicked.addListener((info,tab)=>{
-  // Opening must occur in the user gesture, before any await.
-  chrome.sidePanel.open({tabId:tab.id}).catch(()=>{});
-  enqueue(info.menuItemId,tab,{selectionText:info.selectionText || '',imageUrl:info.srcUrl || ''}).catch(console.error);
-});
+chrome.contextMenus.onClicked.addListener((info,tab)=>handleContextMenu(info,tab).catch(console.error));
 chrome.commands.onCommand.addListener(async(command,tab)=>{
   if(command==='open-panel') {await chrome.sidePanel.open({tabId:tab.id});return;}
   chrome.sidePanel.open({tabId:tab.id}).catch(()=>{});

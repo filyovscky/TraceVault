@@ -1,5 +1,29 @@
 # Фактические проверки
 
+## 0.4.1 — fixed headers and direct context highlights
+
+### Architecture and implementation
+
+- [Capture plan](FIXED-HEADER-PLAN.md), [highlight plan](HIGHLIGHT-PLAN.md). The supplied images showed the viewport header repeated by the old tile stitcher, which only warned about fixed/sticky elements. No supplied evidence file was changed. No GoFullPage code/library was copied.
+- `capture-layout.js` owns a document-scoped temporary presentation session: sticky→relative/insets auto; fixed roots visible at one edge tile; opacity suppression elsewhere. Descendants of transformed/contained scrolling blocks are excluded. Original property values/priorities restore conditionally, preserving unrelated site updates. Finally handles success/error/cancel; a 30-second renewable lease additionally releases temporary styles after an abandoned session.
+- The stitcher retains screenshot-pixel patches and applies them after all tile overlaps. Frames record exact stitch source/destination rectangles; `screenshot_adjustments.fixed_overlays` records retained patches. Saved frame timestamps, bytes and SHA-256 remain verifiable. Method is now `tracevault-scroll-stitch-v2`; normalization is explicit and sequential capture still reports partial.
+- Highlight selection writes immediately with `note=''`; optional note editing uses the existing pinned-reference editor. Context hit testing uses CSS Highlight ranges/rectangles at the right-click point. Delete pins ID/case/URL, rechecks disk state, journals `deleted:true`, broadcasts actual state and offers Undo. A miss returns an error. Source text/DOM structure and original evidence files stay unchanged. Completed command receipts prevent duplicate automatic actions.
+
+### Actual tests
+
+- `npm run check`: ESLint/build and **15/15 unit tests PASS**.
+- **2 fixed-header E2E PASS**, CFT 156 and installed Chrome 155. Each captures a wide 1500×2400 page and a short page just taller than the viewport, exposing large final-frame overlap. Every row in a probe column is checked: exactly 80 header rows, 32 footer rows and 40 natural-flow sticky rows; all other stripe rows match. A right-edge control appears once at the document edge; transformed local-fixed content is excluded from suppression.
+- Entire PNG RGBA buffers reconstructed independently from verified saved frames plus recorded crop/patch metadata match the final PNG. Every frame/artifact SHA-256 is independently read by Node. Styles, priorities, source text and initial x/y scroll match after success, cancellation and size failure; an unrelated site color update survives.
+- **2 context-highlight E2E PASS**, CFT and installed Chrome: real DOM right-click hit testing → same exported handler used by the native menu → real disk annotation with empty note and no modal → duplicate delivery without another annotation/interrupted receipt → optional note edit without changing the reference → point deletion → CSS highlight disappears → Undo restores it → no-hit delete refuses → multi-paragraph highlight saves correctly. Original source body text and archived HTML bytes/SHA-256 are unchanged. On-page feedback is hidden by the actual capture-hide protocol.
+- Regression: existing full PNG/PDF tests **3/3 PASS** (CFT, installed Chrome, cancellation/size/geometry/real 125% zoom/viewport PDF). Inbox and two usability scenarios PASS; English UI and quote/entity/edit/reference scenarios PASS. This is **12 distinct browser scenarios** across targeted runs.
+- Visual QA: [wide fixed/sticky capture](qa/0.4.1-fixed-wide.png), [large final-overlap capture](qa/0.4.1-fixed-short.png). One retained header/footer, no repeating stripes or empty stitch bands. These are local QA pages, not the user's authenticated Dzhino account.
+
+### Findings and limits
+
+- Initial context-test driver attempted dynamic import in a service worker, which Chrome forbids. Production uses static module imports; the driver was corrected to call the shared handler from the extension document. Native OS menu popup item selection itself remains manual; the real handler, point events, queue and disk behavior are tested.
+- Normalization covers the first 20000 top-document elements, max 256 fixed roots and a bounded overlay area. Nested browsing contexts/closed shadow roots, newly appearing overlays and complex transformed/overflowing elements are not universally normalized. Pixel patches include an 8 CSS px margin for common edge effects; arbitrary large effects are not guaranteed. Edge selection for compact bottom/right controls follows viewport geometry.
+- The user's authenticated site was not accessed. Existing PNGs/PDFs are immutable and must be recaptured to use v2. Permission dialogs and physical browser/process termination remain manual acceptance boundaries. The lease is implemented; automated tests exercise finally cleanup rather than waiting for the real lease timeout.
+
 ## 0.4.0 — English icon UI
 
 ### Architecture and API prototype

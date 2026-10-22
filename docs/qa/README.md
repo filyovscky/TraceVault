@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+0.4.1 capture regression: [wide page](0.4.1-fixed-wide.png), [short page with large overlap](0.4.1-fixed-short.png). Actual saved PNGs: one fixed header/footer and one natural-flow sticky bar. Pixel/metadata reconstruction checks are documented in TEST-REPORT.md; supplied user evidence was not rewritten.
+
 0.4.0: English icon UI. [Dark](0.4-panel-dark-320.png), [light](0.4-panel-light-320.png), [Settings](0.4-settings-dark-320.png), [hover description](0.4-tooltip-320.png), [description inside a modal](0.4-settings-tooltip-320.png). Native Chrome checks 32 main-panel and 32 Settings combinations, matching tool-grid geometry and internal horizontal overflow. Earlier screenshots below are historical.
 
 Версия 0.3.2: [Side Panel после cross-origin и SPA](0.3.2-side-panel.png), [светлая тема 320 px/DPR 2](0.3.2-light-320-2.png), [два файла после восстановления доступа](0.3.2-access-restored.png). Отдельная повторная проверка 32 layout-комбинаций прошла; ранние снимки ниже оставлены как история QA.
