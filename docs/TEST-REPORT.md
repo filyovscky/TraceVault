@@ -1,5 +1,15 @@
 # Фактические проверки
 
+## 0.4.4 — default all-site access
+
+- User explicitly requested all-site access by default. Required `<all_urls>` replaces optional host permissions; no production permissions.request calls remain. This pattern is needed for captureVisibleTab without activeTab invocation. Annotation restoration is declared statically for top-level HTTP/HTTPS documents; non-HTML documents return safely. The update handler removes the old dynamic registration. No storage format or dependency changes.
+- `npm run check`: ESLint, **16/16 unit tests**, clean build PASS; `git diff --check` PASS.
+- **7 distinct browser scenarios PASS across targeted runs:** default all-site HTML/PNG/CORS in CFT and installed Chrome, metadata/SPA/tab switches in both, expired-folder recovery with verified disk saves, English UI/settings/filters, and highlight restore after page reload and a real browser restart. Restore now uses the unmodified production manifest, without granting a special loopback origin in a test package.
+- Both all-site scenarios never invoke the extension action or request a domain permission. They install the real production manifest, assert no runtime permission requests (unexpected calls fail), capture actual HTML with cross-origin CSS/SVG, navigate 127.0.0.1 → localhost, capture actual PNG without activeTab invocation, and independently verify saved bytes/SHA-256. Final targeted runs also navigate a raw SVG document without source page errors. Native Chrome and CFT pass.
+- Initial runs had 5-second timing failures waiting for native Chrome tab metadata, first-case status, and CFT source metadata. Native metadata and CFT capture passed on retries. The restart test now waits for actual case-dialog closure and the selected case, rather than a transient status string, allowing 30 seconds for native disk operations; then reload/restart/visibility/ambiguous-anchor checks passed. The runs were not all clean on the first attempt.
+- Limits: tests load unpacked extensions in disposable profiles, so the user-facing Chrome permission-upgrade approval screen was not automated. Chrome can still withhold site access or restrict protected browser/Web Store pages; TraceVault does not override these controls. File URLs remain unsupported in the capture flow; workspace-folder permission is separate. Existing CFT context/Undo timing issue from 0.4.2 was not retested or claimed fixed.
+- API references: [captureVisibleTab permissions](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-captureVisibleTab), [static content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#static-declarative).
+
 ## 0.4.3 — reported Chrome CORS / host access errors
 
 - The screenshots showed a public Google Fonts stylesheet fetched with credentials and a missing-host script injection on mail-tester.com. The capture engine unconditionally used `credentials:include`; panel buttons did not request host access after cross-origin navigation revoked activeTab. No supplied evidence or user session was modified.

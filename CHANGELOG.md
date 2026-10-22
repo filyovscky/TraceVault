@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4 — all-site access by default, 22.10.2026
+
+- Required `<all_urls>` host access replaces optional per-domain access. HTML/PNG/PDF and selection actions no longer call permissions.request. Chrome may require approval on update; user-imposed site restrictions remain under Chrome's control.
+- Manifest content scripts restore annotations automatically on HTTP/HTTPS pages and after browser restart. Update removes the legacy per-domain dynamic registration. Non-HTML documents are skipped safely by the annotation script.
+- The shield appears only when Chrome withholds site access and opens the extension's actual Chrome settings. The separate workspace directory permission flow is unchanged.
+
 ## 0.4.3 — resource CORS and site access, 22.10.2026
 
 - Archive resources and original images use credentialed fetch only on the source page's origin. Cross-origin public CSS/fonts/images use anonymous fetch, compatible with `Access-Control-Allow-Origin: *`. Missing resources still produce partial-capture diagnostics.

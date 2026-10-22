@@ -7,15 +7,9 @@ import {snapshotDocument, buildArchive,resourceCredentials} from './capture.js';
 
 export async function inject(tabId) {
   try{await chrome.scripting.executeScript({target:{tabId},files:['content.js']});}
-  catch(e){if(/Cannot access contents of (?:url|the page)|must request permission|Missing host permission/iu.test(e.message || '')){const error=new Error('Chrome needs access to this site. Use Enable site access (shield) or click the TraceVault extension icon, then repeat the action.');error.name='SiteAccessError';throw error;}throw e;}
+  catch(e){if(/Cannot access contents of (?:url|the page)|must request permission|Missing host permission/iu.test(e.message || '')){const error=new Error('Chrome restricted access to this site. Open TraceVault in chrome://extensions and set Site access to On all sites, then reload the website.');error.name='SiteAccessError';throw error;}throw e;}
 }
 export async function selected(tabId) {await inject(tabId);return chrome.tabs.sendMessage(tabId,{type:'TV_SELECTION'});}
-export async function registerAnnotationSites(origins) {
-  for(const origin of origins)if(!await chrome.permissions.contains({origins:[origin]}))throw new Error("Annotation restore permission missing: "+origin);
-  const registered=await chrome.scripting.getRegisteredContentScripts(),matches=[...new Set(registered.flatMap(s=>s.matches).concat(origins))];
-  if(registered.length)await chrome.scripting.unregisterContentScripts({ids:registered.map(s=>s.id)});
-  await chrome.scripting.registerContentScripts([{id:'tracevault-annotations',matches,js:['content.js'],runAt:'document_idle',persistAcrossSessions:true}]);
-}
 export async function broadcastAnnotations(caseId,state,enabled,hiddenDomains=[]) {
   const values=await chrome.storage.local.get('annotationCache'),cache=values.annotationCache || {};
   cache[caseId]=Object.values(state.annotations).filter(a=>!a.deleted);

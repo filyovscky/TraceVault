@@ -6,26 +6,28 @@ import http from 'node:http';
 import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 
-for(const installed of [false,true])test(`public cross-origin CSS archives without credentialed CORS; missing site access has a real recovery path${installed?' — installed Chrome':''}`,async()=>{
+for(const installed of [false,true])test(`default all-site access: HTML, PNG and CORS across origins without action invocation${installed?' — installed Chrome':''}`,async()=>{
   test.setTimeout(120000);const requests=[],publicServer=http.createServer((req,res)=>{requests.push({url:req.url,origin:req.headers.origin,cookie:req.headers.cookie});res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Content-Type',req.url==='/asset.svg'?'image/svg+xml':'text/css');res.end(req.url==='/asset.svg'?'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="red"/></svg>':'body{--cors-proof:42;background-image:url("/asset.svg")}');});
   await new Promise(resolve=>publicServer.listen(0,'127.0.0.1',resolve));
   const fixture=await fixtureServer(),run=Date.now(),directory=path.resolve('output/playwright/cors-workspace-'+run),context=await launch(path.resolve('output/playwright/cors-profile-'+run),{installed});
   try{
     const panel=await extensionPage(context),errors=[];panel.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     await panel.evaluate(()=>chrome.sidePanel.setOptions({enabled:false}));await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('CORS');await panel.locator('#case-title').fill('CORS and access');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();
-    const source=await context.newPage();await source.goto(fixture.url+'/public-resources');await source.bringToFront();await expect(panel.locator('#source-url')).toHaveText(source.url());
-    const denied=await panel.evaluate(async()=>{const {inject}=await import('./service.js'),[tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});try{await inject(tab.id);return null;}catch(e){return {name:e.name,message:e.message};}});expect(denied.name).toBe('SiteAccessError');expect(denied.message).toContain('shield');
-    // Only the denial branch is injected: never pretend that host permission was granted.
-    await panel.evaluate(()=>{window.__permissionRequests=[];window.__permissionRequest=chrome.permissions.request.bind(chrome.permissions);chrome.permissions.request=options=>{window.__permissionRequests.push({options,gesture:navigator.userActivation.isActive});return Promise.resolve(false);};});
-    await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Site access was not granted');expect(await panel.evaluate(()=>window.__permissionRequests)).toEqual([{options:{origins:['http://127.0.0.1/*']},gesture:true}]);
-    expect(await panel.locator('#list .item').count()).toBe(0);expect(errors).toEqual([]);await panel.evaluate(()=>{chrome.permissions.request=window.__permissionRequest;});
-    await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#refresh-source').click();await expect(panel.locator('#site-state')).toContainText('Temporary site access is enabled');
+    const source=await context.newPage(),sourceErrors=[];source.on('pageerror',e=>sourceErrors.push(e.message));await source.goto(fixture.url+'/public-resources');await source.bringToFront();await expect(panel.locator('#source-url')).toHaveText(source.url());
+    await panel.evaluate(()=>{window.__permissionRequests=[];chrome.permissions.request=options=>{window.__permissionRequests.push(options);throw new Error('Unexpected runtime site permission request');};});
+    await expect(panel.locator('#site-state')).toHaveText('Site access enabled');await expect(panel.locator('#grant-site')).not.toBeVisible();
     const publicUrl=`http://localhost:${publicServer.address().port}`;
     await source.evaluate(url=>{document.querySelectorAll('link,style').forEach(n=>n.remove());const link=document.createElement('link');link.rel='stylesheet';link.href=url+'/public.css';document.head.append(link);},publicUrl);
     await panel.locator('#refresh-source').click();await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:30000});
     const record=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures)[0];});
     expect(record.warnings).toEqual([]);const bytes=await readFile(path.join(directory,record.artifacts[0].relative_path));expect(createHash('sha256').update(bytes).digest('hex')).toBe(record.artifacts[0].sha256);expect(bytes.toString()).toContain('--cors-proof:42');expect(bytes.toString()).toContain('data:image/svg+xml;base64,');
-    expect(requests.some(r=>r.origin?.startsWith('chrome-extension://') && r.url==='/public.css')).toBe(true);expect(errors.filter(e=>/CORS|Cannot access contents/u.test(e))).toEqual([]);
+    expect(requests.some(r=>r.url==='/public.css')).toBe(true);expect(errors.filter(e=>/CORS|Cannot access contents/u.test(e))).toEqual([]);
+    // A new origin revokes activeTab, and this test never invokes the action at all.
+    await source.goto(fixture.url.replace('127.0.0.1','localhost')+'/second-site');await source.bringToFront();await expect(panel.locator('#source-url')).toHaveText(source.url());await expect(panel.locator('#site-state')).toHaveText('Site access enabled');
+    await panel.locator('#capture-screen').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000002',{timeout:30000});
+    const screen=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures).find(c=>c.evidence_number==='EVD-000002');});
+    expect(screen.kind).toBe('screenshot');expect(screen.source.final_url).toBe(source.url());const png=await readFile(path.join(directory,screen.artifacts[0].relative_path));expect(createHash('sha256').update(png).digest('hex')).toBe(screen.artifacts[0].sha256);expect(png.subarray(1,4).toString()).toBe('PNG');expect(await panel.evaluate(()=>window.__permissionRequests)).toEqual([]);expect(errors).toEqual([]);
+    await source.goto(fixture.url+'/icon.svg');await expect.poll(()=>source.evaluate(()=>document.contentType)).toBe('image/svg+xml');expect(sourceErrors).toEqual([]);
   }finally{await context.close();fixture.server.close();publicServer.close();}
 });
 

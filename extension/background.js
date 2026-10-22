@@ -4,6 +4,10 @@ chrome.runtime.onInstalled.addListener(async()=>{
   await chrome.contextMenus.removeAll();
   for(const [id,title] of Object.entries(menus)) chrome.contextMenus.create({id,title,contexts:id.endsWith('-highlight')?['all']:[id==='image'?'image':'selection'],documentUrlPatterns:['http://*/*','https://*/*']});
   await chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:false});
+  // 0.4.3 and earlier registered per-site restore scripts. The manifest now
+  // restores annotations on all HTTP(S) pages, including after browser restart.
+  const registered=await chrome.scripting.getRegisteredContentScripts({ids:['tracevault-annotations']});
+  if(registered.length)await chrome.scripting.unregisterContentScripts({ids:['tracevault-annotations']});
 });
 // A real action invocation grants activeTab, unlike a click inside an already
 // open side panel. Keep opening in this synchronous user-gesture handler.

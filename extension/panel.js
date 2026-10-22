@@ -1,7 +1,7 @@
 import {setting,openWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
 import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from './domain.js';
-import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites,convertScreenshotToPdf} from './service.js';
+import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
 import {initControls,setActionLabel} from './icons.js';
 const $=id=>document.getElementById(id);
@@ -21,7 +21,6 @@ function switchView(next){
   document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});renderList();
 }
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
-let sourceAccess=null;
 function status(message,error=false) {$('status').textContent=message;$('status').parentElement.dataset.error=String(error);const alert=document.querySelector('dialog[open] .dialog-error');if(alert){alert.hidden=!error;alert.textContent=error?message:'';}}
 async function reportError(e){if(e.name!=='SiteAccessError')console.error('TraceVault:',e);status(errorText(e),true);if(root)try{await renderFolder();}catch{/* Keep the original error; source navigation stays independent. */}}
 function errorText(e) {
@@ -32,17 +31,6 @@ function errorText(e) {
   return e.message || String(e);
 }
 function action(id,fn) {$(id).addEventListener('click',()=>{try{Promise.resolve(fn()).catch(reportError);}catch(e){reportError(e);}});}
-function withSourceAccess(fn){
-  const source=tab;
-  if(!root || preferences.paused || !/^https?:/u.test(source?.url || '') || (sourceAccess?.id===source.id && sourceAccess.url===source.url))return fn();
-  // Request synchronously inside the actual button gesture. An already-open
-  // panel cannot acquire activeTab just by running an asynchronous capture.
-  return chrome.permissions.request({origins:[hostPattern(source.url)]}).then(async granted=>{
-    if(!granted){const e=new Error('Site access was not granted. Use the shield or click the TraceVault extension icon to try again.');e.name='SiteAccessError';throw e;}
-    const current=await currentTab();if(current?.id!==source.id || current.url!==source.url)throw new Error('The source changed while requesting access. Repeat the action.');
-    sourceAccess={id:source.id,url:source.url};await registerAnnotationSites([hostPattern(source.url)]);await refreshSource();return fn();
-  });
-}
 function el(tag,text,cls) {const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 function button(label,fn,text=false) {const b=el('button');if(label)setActionLabel(b,label,undefined,text);b.addEventListener('click',()=>Promise.resolve().then(fn).catch(reportError));return b;}
 function field(dl,label,value,cls) {dl.append(el('dt',label),el('dd',value ?? '—',cls));}
@@ -97,15 +85,14 @@ async function currentTab() {
 }
 async function refreshSource() {
   const revision=++sourceRevision,source=await currentTab();if(revision!==sourceRevision)return;tab=source;
-  if(sourceAccess?.id!==source?.id || sourceAccess?.url!==source?.url)sourceAccess=null;
   $('source-title').textContent=tab?.title || "Open an HTTP/HTTPS site";$('source-url').textContent=tab?.url || "URL access has not been granted";$('source-url').title=tab?.url || '';
   if(tab && /^https?:/u.test(tab.url || ''))await setting('sourceTab:'+tab.windowId,tab.id);
   if(revision!==sourceRevision)return;
   let permitted=false;
   if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[hostPattern(tab.url)]});
   if(revision!==sourceRevision)return;
-  $('site-state').textContent=permitted?"Annotation auto-restore is enabled":/^https?:/u.test(tab?.url || '')?"Capture or annotate to request site access. Use the shield to also enable annotation auto-restore.":"Open an HTTP/HTTPS site.";
-  setActionLabel($('grant-site'),"Enable site access and annotation restore");
+  $('site-state').textContent=permitted?"Site access enabled":/^https?:/u.test(tab?.url || '')?"Chrome restricted site access. Open extension settings and select On all sites.":"Open an HTTP/HTTPS site.";
+  setActionLabel($('grant-site'),"Open Chrome site access settings");
   $('grant-site').hidden=permitted || !/^https?:/u.test(tab?.url || '');
   $('site-annotations').hidden=!/^https?:/u.test(tab?.url || '');
   const siteHidden=/^https?:/u.test(tab?.url || '') && preferences.hiddenAnnotationDomains.includes(new URL(tab.url).hostname);
@@ -113,7 +100,7 @@ async function refreshSource() {
   if(activeCase && root && workspace && await root.queryPermission({mode:'read'})==='granted'){const c=context();try{const fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(revision!==sourceRevision)return;if(activeCase===c.caseId && root===c.root)state=fresh;}catch(e){await renderFolder();if(revision===sourceRevision)status(errorText(e),true);}}
   if(revision!==sourceRevision)return;
   if(source?.id) {
-    try {await inject(source.id);if(revision!==sourceRevision)return;sourceAccess={id:source.id,url:source.url};if(!permitted)$('site-state').textContent='Temporary site access is enabled. Use the shield to enable annotation auto-restore.';const data=await chrome.tabs.sendMessage(source.id,{type:'TV_RENDER',annotations:Object.values(state.annotations).filter(a=>a.source_url===source.url && !a.deleted),enabled:preferences.annotations && !siteHidden});if(revision===sourceRevision)Object.assign(statuses,data?.statuses);}catch {if(revision===sourceRevision)sourceAccess=null; /* UI explains missing permission */ }
+    try {await inject(source.id);if(revision!==sourceRevision)return;const data=await chrome.tabs.sendMessage(source.id,{type:'TV_RENDER',annotations:Object.values(state.annotations).filter(a=>a.source_url===source.url && !a.deleted),enabled:preferences.annotations && !siteHidden});if(revision===sourceRevision)Object.assign(statuses,data?.statuses);}catch { /* UI explains restricted access */ }
   }
   if(revision===sourceRevision)renderList();
 }
@@ -322,14 +309,9 @@ action('new-case',()=>{if(!root)throw new Error("Choose a folder first");$('case
 $('case-form').addEventListener('submit',event=>{event.preventDefault();(async()=>{const c=await exclusive(()=>createCase(root,workspace,$('case-title').value,$('case-code').value));cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status("Case created");await processInbox();})().catch(reportError);});
 $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
-action('grant-site',async()=>{
-  if(!/^https?:/u.test(tab?.url || ''))throw new Error("No HTTP/HTTPS URL available");
-  const origin=hostPattern(tab.url);
-  if(!await chrome.permissions.request({origins:[origin]}))throw new Error("Permission not granted");
-  await registerAnnotationSites([origin]);await refreshSource();status("Site access granted");
-});
-action('capture-page',()=>withSourceAccess(()=>runCapture('page')));action('capture-screen',()=>withSourceAccess(()=>runCapture('screen')));action('capture-full',()=>withSourceAccess(()=>runCapture('full')));action('capture-pdf',()=>withSourceAccess(()=>runCapture('pdf')));action('cancel',()=>controller?.abort());
-for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>withSourceAccess(()=>beginAnnotation(name)));action('manual-note',()=>beginAnnotation('manual'));
+action('grant-site',()=>chrome.tabs.create({url:'chrome://extensions/?id='+chrome.runtime.id}));
+action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('capture-full',()=>runCapture('full'));action('capture-pdf',()=>runCapture('pdf'));action('cancel',()=>controller?.abort());
+for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>beginAnnotation(name));action('manual-note',()=>beginAnnotation('manual'));
 action('archive-first',async()=>{if(!pending)return;const p=pending;const source=await chrome.tabs.get(p.tabId);if(source.url!==p.sourceUrl)throw new Error("URL changed");const result=await runCapture('page',{tabId:p.tabId,caseId:p.caseId,id:uuid()});if(!['completed','partial'].includes(result.state))throw new Error("Archive not verified");p.captureId=result.capture_id;$('reference-state').textContent=`Linked to ${result.evidence_number} · ${result.capture_id}`;});
 $('annotation-form').addEventListener('submit',e=>saveDialog(e).catch(reportError));
 $('entity-type').replaceChildren(...ENTITY_TYPES.map(type=>Object.assign(el('option',t(type)),{value:type})));$('entity-type').addEventListener('change',updateDuplicates);$('entity-label').addEventListener('input',updateDuplicates);
@@ -408,7 +390,7 @@ function scheduleSource(){clearTimeout(sourceTimer);sourceTimer=setTimeout(()=>r
 chrome.tabs.onActivated.addListener(scheduleSource);
 chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.url || info.title || info.status)scheduleSource();});
 chrome.tabs.onRemoved.addListener(scheduleSource);
-chrome.permissions.onRemoved.addListener(()=>{sourceAccess=null;scheduleSource();});
+chrome.permissions.onRemoved.addListener(scheduleSource);
 chrome.permissions.onAdded.addListener(scheduleSource);
 window.addEventListener('focus',scheduleSource);
 async function init() {

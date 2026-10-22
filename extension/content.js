@@ -1,4 +1,5 @@
 (() => {
+  if(!document.body || !(document.documentElement instanceof HTMLElement))return;
   if(globalThis.__tracevaultLoaded) return;
   globalThis.__tracevaultLoaded=true;
   let enabled=true,hidden=false,annotations=[],lastSelection=null,lastSelectionText=null,host=null,revision=0,lastContext=null,feedbackHost=null,feedbackTimer,feedbackExpires=0;
