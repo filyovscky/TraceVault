@@ -16,6 +16,7 @@
     <section id="source-section">
       <div class="row source-head"><h2>Текущая страница</h2><button id="refresh-source">Обновить</button></div>
       <div id="source-title" class="source-title">Откройте сайт</div><div id="source-url" class="url muted wrap"></div>
+      <div id="capture-exclusion" hidden><p id="capture-exclusion-reason" class="muted wrap"></p><button id="allow-capture-site">Разрешить фиксацию на этом сайте</button></div>
       <div id="site-state" class="muted"></div><button id="grant-site">Разрешить доступ к этому сайту</button>
       <p class="muted privacy">В архив попадут видимые данные страницы, включая личные.</p>
       <div class="actions"><button id="capture-page" class="primary">Сохранить страницу</button><button id="capture-screen">Скриншот</button><button id="capture-full">Полный PNG</button><button id="capture-pdf">Страница в PDF</button><button id="cancel" hidden>Отменить</button></div>
@@ -29,6 +30,7 @@
       <label class="check"><input id="paused" type="checkbox"> Приостановить всю фиксацию</label>
       <button id="site-annotations" hidden>Скрыть аннотации на этом сайте</button>
       <label>Исключённые домены (по одному в строке)<textarea id="blocked-domains" rows="3" placeholder="bank.example"></textarea></label>
+      <label>Разрешённые сайты — исключения из блокировки (точные домены)<textarea id="allowed-capture-hosts" rows="2" placeholder="mail.google.com"></textarea></label>
       <label>Предел захвата, МБ<input id="max-size" type="number" min="1" max="256" value="64"></label>
       <button id="save-settings">Сохранить настройки</button><button id="shortcuts">Горячие клавиши Chrome</button>
       <div id="shortcut-list" aria-live="polite"></div><button id="refresh-shortcuts">Проверить назначения</button>

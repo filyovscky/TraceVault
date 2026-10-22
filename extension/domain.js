@@ -1,4 +1,4 @@
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();
@@ -41,8 +41,14 @@ export function assertWebTab(tab, settings = {}) {
   if (!tab || !/^https?:\/\//u.test(tab.url || '')) throw new Error('Страница не поддерживается. Откройте HTTP/HTTPS сайт и вызовите TraceVault кнопкой расширения.');
   if (tab.incognito) throw new Error('Фиксация в инкогнито отключена');
   if (settings.paused) throw new Error('Фиксация приостановлена в настройках');
-  const host = new URL(tab.url).hostname;
-  if ((settings.blockedDomains || []).some(d => host === d || host.endsWith('.'+d))) throw new Error('Домен исключён из фиксации');
+  const rule=captureExclusion(tab.url,settings);
+  if(rule)throw new Error(`Домен ${new URL(tab.url).hostname} исключён правилом ${rule} в настройках TraceVault. Нажмите «Разрешить фиксацию на этом сайте» в панели или измените список исключений.`);
+}
+export function captureExclusion(url,settings={}) {
+  try{const host=new URL(url).hostname.toLowerCase().replace(/\.$/u,'');if((settings.allowedCaptureHosts || []).includes(host))return null;return (settings.blockedDomains || []).find(rule=>matchesDomain(url,rule)) || null;}catch{return null;}
+}
+export function captureHostList(text) {
+  return [...new Set(text.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{try{const u=new URL(line.includes('://')?line:'https://'+line);if(!/^https?:$/u.test(u.protocol))throw new Error();return u.hostname.toLowerCase().replace(/\.$/u,'');}catch{throw new Error('Некорректный домен в настройках: '+line);}}))];
 }
 export function normalize(type, value) {
   const v = value.normalize('NFC').trim();

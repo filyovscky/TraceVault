@@ -1,0 +1,17 @@
+import {test,expect} from '@playwright/test';
+import path from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
+import {fixtureServer} from './fixture-server.mjs';
+test('exclusions: real block, explicit exact-host allow, disk capture, reload and re-block',async()=>{
+  test.setTimeout(90000);const run=Date.now(),directory=path.resolve('output/playwright/exclusion-workspace-'+run),context=await launch(path.resolve('output/playwright/exclusion-profile-'+run)),fixture=await fixtureServer();
+  try{
+    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('DOMAIN');await panel.locator('#case-title').fill('Domain exceptions');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#refresh-source').click();await panel.locator('#settings-toggle').click();await panel.locator('#blocked-domains').fill('127.0.0.1\nbank.test');await panel.locator('#save-settings').click();await expect(panel.locator('#capture-exclusion')).toBeVisible();await expect(panel.locator('#capture-exclusion-reason')).toContainText('127.0.0.1');await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('исключён правилом 127.0.0.1');await expect(panel.locator('#list .item')).toHaveCount(0);
+    await panel.locator('#allow-capture-site').click();await expect(panel.locator('#capture-exclusion')).not.toBeVisible();await expect(panel.locator('#allowed-capture-hosts')).toHaveValue('127.0.0.1');await expect(panel.locator('#blocked-domains')).toHaveValue('127.0.0.1\nbank.test');await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Сохранено · EVD-000001',{timeout:30000});
+    const capture=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures)[0];});const bytes=await readFile(path.join(directory,capture.artifacts[0].relative_path));expect(createHash('sha256').update(bytes).digest('hex')).toBe(capture.artifacts[0].sha256);
+    await panel.reload();await panel.locator('#refresh-source').click();await expect(panel.locator('#capture-exclusion')).not.toBeVisible();await panel.locator('#settings-toggle').click();await expect(panel.locator('#allowed-capture-hosts')).toHaveValue('127.0.0.1');await panel.locator('#allowed-capture-hosts').fill('');await panel.locator('#save-settings').click();await expect(panel.locator('#capture-exclusion')).toBeVisible();await panel.locator('#capture-screen').click();await expect(panel.locator('#status')).toContainText('исключён правилом 127.0.0.1');await expect(panel.locator('#list .item')).toHaveCount(1);
+    await panel.setViewportSize({width:360,height:900});await panel.locator('#settings-toggle').click();await panel.screenshot({path:path.resolve('output/playwright/exclusion-reason.png')});
+  }finally{await context.close();fixture.server.close();}
+});

@@ -1,11 +1,11 @@
 import {setting,openWorkspace,exclusive,readJSON,readVerifiedFile,writeNew,probe} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
-import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation} from './domain.js';
+import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,captureExclusion,captureHostList} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
 const $=id=>document.getElementById(id);
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
-let preferences={theme:'system',paused:false,blockedDomains:['mail.google.com','outlook.live.com','outlook.office.com','vault.bitwarden.com','online.sberbank.ru','online.vtb.ru'],hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
+let preferences={theme:'system',paused:false,blockedDomains:['mail.google.com','outlook.live.com','outlook.office.com','vault.bitwarden.com','online.sberbank.ru','online.vtb.ru'],allowedCaptureHosts:[],hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
 const statuses={};
 const sessionId=uuid();
 let syncRevision=0,lastDeleted=null;
@@ -23,7 +23,7 @@ function button(label,fn) {const b=el('button',label);b.addEventListener('click'
 function field(dl,label,value,cls) {dl.append(el('dt',label),el('dd',value ?? '—',cls));}
 function link(url,label) {const a=el('a',label);if(/^https?:\/\//u.test(url||'')){a.href=url;a.target='_blank';a.rel='noreferrer noopener';}return a;}
 function context() {if(!root || !workspace || !activeCase) throw new Error('Выберите рабочую папку и активное дело');return {root,workspace,caseId:activeCase};}
-async function canWrite() {context();if(await root.queryPermission({mode:'readwrite'})!=='granted') throw new Error('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».');}
+async function canWrite() {preferences={...preferences,...await setting('preferences')};context();if(await root.queryPermission({mode:'readwrite'})!=='granted') throw new Error('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».');}
 async function refresh() {
   if(activeCase && root) {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root){state=fresh;await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);}}
   renderList();await renderFolder();
@@ -59,9 +59,11 @@ async function currentTab() {
   return tabs[0] || null;
 }
 async function refreshSource() {
+  preferences={...preferences,...await setting('preferences')};
   if(activeCase && root && workspace) {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root)state=fresh;}
   tab=await currentTab();
   if(tab && /^https?:/u.test(tab.url || '')) await setting('sourceTab:'+tab.windowId,tab.id);
+  const excluded=tab?.url?captureExclusion(tab.url,preferences):null;$('capture-exclusion').hidden=!excluded;$('capture-exclusion-reason').textContent=excluded?`Фиксация ${new URL(tab.url).hostname} отключена правилом «${excluded}» в настройках TraceVault.`:'';
   $('source-title').textContent=tab?.title || 'Откройте HTTP/HTTPS сайт';$('source-url').textContent=tab?.url || 'Доступ к URL пока не выдан';$('source-url').title=tab?.url || '';
   let permitted=false;
   if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[hostPattern(tab.url)]});
@@ -248,6 +250,7 @@ action('new-case',()=>{if(!root)throw new Error('Сначала выберите
 $('case-form').addEventListener('submit',event=>{event.preventDefault();(async()=>{const c=await exclusive(()=>createCase(root,workspace,$('case-title').value,$('case-code').value));cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status('Дело создано');await processInbox();})().catch(e=>status(errorText(e),true));});
 $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
+action('allow-capture-site',async()=>{const source=await currentTab();if(!/^https?:/u.test(source?.url || ''))throw new Error('Откройте исходный HTTP/HTTPS сайт');const host=new URL(source.url).hostname.toLowerCase().replace(/\.$/u,'');preferences={...preferences,...await setting('preferences')};preferences.allowedCaptureHosts=[...new Set([...(preferences.allowedCaptureHosts || []),host])];await setting('preferences',preferences);$('allowed-capture-hosts').value=preferences.allowedCaptureHosts.join('\n');await refreshSource();status(`Фиксация ${host} разрешена. Другие исключения сохранены.`);});
 action('grant-site',async()=>{
   if(!/^https?:/u.test(tab?.url || ''))throw new Error('Нет доступного HTTP/HTTPS URL');
   const origin=hostPattern(tab.url);
@@ -271,7 +274,7 @@ action('workspace',()=>chrome.tabs.create({url:chrome.runtime.getURL('panel.html
 action('settings-toggle',()=>{$('settings').hidden=!$('settings').hidden;$('settings-toggle').setAttribute('aria-expanded',String(!$('settings').hidden));});
 action('shortcuts',()=>chrome.tabs.create({url:'chrome://extensions/shortcuts'}));
 $('theme').addEventListener('change',()=>{document.documentElement.dataset.theme=$('theme').value;});
-action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024,blockedDomains:$('blocked-domains').value.split('\n').map(s=>s.trim().toLowerCase()).filter(Boolean)};await setting('preferences',preferences);status('Настройки сохранены');});
+action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024,blockedDomains:captureHostList($('blocked-domains').value),allowedCaptureHosts:captureHostList($('allowed-capture-hosts').value)};await setting('preferences',preferences);await refreshSource();status('Настройки сохранены');});
 $('annotations-toggle').addEventListener('change',()=>{(async()=>{preferences.annotations=$('annotations-toggle').checked;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
 action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status('Аннотация восстановлена в исходном деле');});
@@ -333,7 +336,7 @@ chrome.tabs.onActivated.addListener(()=>refreshSource().catch(()=>{}));
 chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.status==='complete')refreshSource().catch(()=>{});});
 async function init() {
   if(new URL(location.href).searchParams.has('workspace'))document.body.classList.add('workspace');
-  preferences={...preferences,...await setting('preferences')};document.documentElement.dataset.theme=preferences.theme;$('theme').value=preferences.theme;$('paused').checked=preferences.paused;$('blocked-domains').value=preferences.blockedDomains.join('\n');$('max-size').value=preferences.maxBytes/1024/1024;$('annotations-toggle').checked=preferences.annotations;
+  preferences={...preferences,...await setting('preferences')};document.documentElement.dataset.theme=preferences.theme;$('theme').value=preferences.theme;$('paused').checked=preferences.paused;$('blocked-domains').value=preferences.blockedDomains.join('\n');$('allowed-capture-hosts').value=(preferences.allowedCaptureHosts || []).join('\n');$('max-size').value=preferences.maxBytes/1024/1024;$('annotations-toggle').checked=preferences.annotations;
   const handle=await setting('root');
   if(handle) {
     root=handle;
