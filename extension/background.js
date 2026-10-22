@@ -2,8 +2,11 @@ const menus={quote:'Сохранить выделенный текст',highligh
 chrome.runtime.onInstalled.addListener(async()=>{
   await chrome.contextMenus.removeAll();
   for(const [id,title] of Object.entries(menus)) chrome.contextMenus.create({id,title,contexts:[id==='image'?'image':'selection'],documentUrlPatterns:['http://*/*','https://*/*']});
-  await chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true});
+  await chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:false});
 });
+// A real action invocation grants activeTab, unlike a click inside an already
+// open side panel. Keep opening in this synchronous user-gesture handler.
+chrome.action.onClicked.addListener(tab=>{chrome.sidePanel.open({tabId:tab.id}).catch(console.error);});
 async function enqueue(action,tab,extra={}) {
   if(!tab?.id) return;
   const {activeCase}=await chrome.storage.local.get('activeCase');

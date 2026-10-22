@@ -1,12 +1,23 @@
 import {chromium,expect} from '@playwright/test';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import path from 'node:path';
 export async function launch(profile) {
   await mkdir(path.join(profile,'Default'),{recursive:true});
   // Only this isolated QA profile: permit native FSA writes without an unattended
   // browser permission bubble. No permission monkey-patching and no OPFS storage.
-  await writeFile(path.join(profile,'Default','Preferences'),JSON.stringify({profile:{default_content_setting_values:{file_system_write_guard:1,file_system_read_guard:1}}}));
-  return chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,args:[`--disable-extensions-except=${path.resolve('extension')}`,`--load-extension=${path.resolve('extension')}`,'--auto-accept-file-system-access-permission-requests']});
+  const prefPath=path.join(profile,'Default','Preferences');let prefs={};
+  try{prefs=JSON.parse(await readFile(prefPath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
+  prefs.profile ||= {};prefs.profile.default_content_setting_values ||= {};
+  Object.assign(prefs.profile.default_content_setting_values,{file_system_write_guard:1,file_system_read_guard:1});
+  await writeFile(prefPath,JSON.stringify(prefs));
+  return chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,args:[`--disable-extensions-except=${path.resolve('extension')}`,`--load-extension=${path.resolve('extension')}`,'--enable-unsafe-extension-debugging']});
+}
+export async function invokeExtension(context,page,id) {
+  const browserCDP=await context.browser().newBrowserCDPSession();
+  const {targetInfos}=await browserCDP.send('Target.getTargets',{filter:[{type:'tab',exclude:false}]});
+  const target=targetInfos.find(t=>t.url===page.url());
+  if(!target)throw new Error('Tab target missing: '+JSON.stringify(targetInfos));
+  await browserCDP.send('Extensions.triggerAction',{id,targetId:target.targetId});await browserCDP.detach();
 }
 export async function extensionPage(context) {
   const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');

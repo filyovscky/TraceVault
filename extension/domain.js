@@ -3,6 +3,7 @@ export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();
 export const uuid = () => crypto.randomUUID();
+export function hostPattern(url) {const u=new URL(url);if(!/^https?:$/u.test(u.protocol))throw new Error('Неподдерживаемый протокол');return `${u.protocol}//${u.hostname}/*`;}
 export function clock() {
   return {timezone_id: Intl.DateTimeFormat().resolvedOptions().timeZone, local_offset_minutes: -new Date().getTimezoneOffset(), clock_source: 'system_clock'};
 }

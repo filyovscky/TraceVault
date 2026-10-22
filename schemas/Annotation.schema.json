@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "Annotation.schema.json",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "annotation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "source_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "capture_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reference_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "type": {
+      "enum": [
+        "text_highlight",
+        "quote",
+        "note"
+      ]
+    },
+    "selection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "exact": {
+              "type": "string"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "suffix": {
+              "type": "string"
+            },
+            "start_offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end_offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "dom_hint": {
+              "type": "string"
+            },
+            "normalization": {
+              "const": "textContent UTF-16 v1"
+            },
+            "anchor_version": {
+              "const": 1
+            }
+          },
+          "required": [
+            "exact",
+            "prefix",
+            "suffix",
+            "start_offset",
+            "end_offset",
+            "dom_hint",
+            "normalization",
+            "anchor_version"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "appearance": {
+      "type": "object",
+      "properties": {
+        "color_token": {
+          "enum": [
+            "amber",
+            "green",
+            "violet"
+          ]
+        }
+      },
+      "required": [
+        "color_token"
+      ],
+      "additionalProperties": true
+    },
+    "note": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "author": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "reattachment_status": {
+      "enum": [
+        "pending",
+        "attached",
+        "ambiguous",
+        "orphaned",
+        "not_applicable"
+      ]
+    },
+    "hidden": {
+      "type": "boolean"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "annotation_id",
+    "case_id",
+    "source_url",
+    "capture_id",
+    "reference_id",
+    "type",
+    "selection",
+    "appearance",
+    "note",
+    "tags",
+    "author",
+    "created_at",
+    "updated_at",
+    "reattachment_status",
+    "hidden",
+    "deleted"
+  ],
+  "additionalProperties": true
+}

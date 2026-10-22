@@ -1,6 +1,6 @@
 import {setting,openWorkspace,exclusive,readJSON,readFile,writeNew,probe} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
-import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab} from './domain.js';
+import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase} from './service.js';
 import {t} from './i18n.js';
 const $=id=>document.getElementById(id);
@@ -13,6 +13,7 @@ function errorText(e) {
   if(e.name==='AbortError') return 'Операция отменена';
   if(e.name==='QuotaExceededError') return 'Недостаточно места или превышена квота. Освободите место и повторите.';
   if(e.name==='NotAllowedError') return 'Нет доступа к рабочей папке или сайту. Восстановите соответствующее разрешение.';
+  if(e.name==='InvalidStateError') return 'Не удалось восстановить доступ к папке из браузера. Выберите существующую рабочую папку снова; файлы на диске сохраняются.';
   return e.message || String(e);
 }
 function action(id,fn) {$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(errorText(e),true)));}
@@ -60,7 +61,7 @@ async function refreshSource() {
   if(tab && /^https?:/u.test(tab.url || '')) await setting('sourceTab',tab.id);
   $('source-title').textContent=tab?.title || 'Откройте HTTP/HTTPS сайт';$('source-url').textContent=tab?.url || 'Доступ к URL пока не выдан';$('source-url').title=tab?.url || '';
   let permitted=false;
-  if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[new URL(tab.url).origin+'/*']});
+  if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[hostPattern(tab.url)]});
   $('site-state').textContent=permitted?'Доступ к сайту выдан · восстановление аннотаций включено':'Для явного действия нажмите значок расширения на сайте; для восстановления аннотаций разрешите этот домен.';
   $('grant-site').hidden=permitted || !/^https?:/u.test(tab?.url || '');
   if(tab?.id) {
@@ -83,7 +84,7 @@ function setBusy(value) {for(const id of ['capture-page','capture-screen','archi
 async function beginAnnotation(actionName,command=null) {
   await canWrite();const c=context(),sourceId=command?.tabId || tab?.id;if(command?.caseId)c.caseId=command.caseId;
   let data=null;
-  if(sourceId){const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);data=await selected(sourceId);}
+  if(sourceId && actionName!=='manual'){const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);data=await selected(sourceId);}
   const sel=data?.selection;
   if(actionName!=='manual' && !sel?.exact) throw new Error('Выделите текст на странице; поля ввода и редакторы исключены');
   if(command?.selectionText && sel.exact!==command.selectionText) throw new Error('Выделение изменилось с момента вызова меню. Выделите текст снова.');
@@ -133,7 +134,7 @@ function renderList() {
     const id=row.capture_id || row.annotation_id || row.entity_id || row.event_id,item=el('div',undefined,'item'+(selectedId===id?' selected':''));item.setAttribute('role','listitem');
     const b=button('',()=>view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
     let title,meta;
-    if(view==='captures'){title=`${row.pinned?'Закреплено · ':''}${row.evidence_number} · ${row.source.title}`;meta=`${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
+    if(view==='captures'){title=`${row.pinned?'Закреплено · ':''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.kind==='screenshot'?'PNG':'Изображение'} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
     else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · не подтверждено · ${row.evidence_refs.length} ист. · ${localTime(row.created_at)}`;}
     else {title=row.action;meta=localTime(row.recorded_at);}
@@ -163,6 +164,7 @@ function showCapture(id) {
     const row=el('div',undefined,'actions');row.append(button('Открыть файл',()=>openArtifact(a)),button('Проверить хеш',async()=>{const result=await verifyArtifact(root,workspace,c.case_id,a);status(result.ok?'SHA-256 подтверждён повторным чтением':'Хеш НЕ совпадает. Файл изменён: '+result.actual,!result.ok);}),button('Копировать SHA-256',()=>navigator.clipboard.writeText(a.sha256)),button('Экспорт оригинала',()=>exportOriginal(a,c.case_id)));box.append(row);
   }
   const pin=button(c.pinned?'Открепить':'Закрепить',async()=>{await exclusive(()=>append(root,workspace,c.case_id,'capture_pinned','captures',{...c,pinned:!c.pinned}));await refresh();showCapture(id);});box.append(pin);
+  if(['failed','interrupted','cancelled','partial'].includes(c.state))box.append(button('Повторить новой фиксацией',async()=>{await refreshSource();if(tab?.url!==c.source.final_url)throw new Error('Откройте исходный URL и нажмите значок TraceVault перед повтором');await runCapture(c.kind==='webpage'?'page':c.kind==='screenshot'?'screen':'image',{id:uuid(),tabId:tab.id,caseId:c.case_id,sourceUrl:c.source.final_url,imageUrl:c.image_source_url});}));
   if(c.warnings.length){box.append(el('h2','Диагностика неполноты'));const pre=el('pre',JSON.stringify(c.warnings,null,2));box.append(pre);}
   const refs=Object.values(state.refs).filter(r=>r.capture_id===id);if(refs.length)box.append(el('p',`Связанные ссылки на фрагменты: ${refs.length}`));
 }
@@ -214,7 +216,7 @@ $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-se
 action('refresh-source',refreshSource);
 action('grant-site',async()=>{
   if(!/^https?:/u.test(tab?.url || ''))throw new Error('Нет доступного HTTP/HTTPS URL');
-  const origin=new URL(tab.url).origin+'/*';
+  const origin=hostPattern(tab.url);
   if(!await chrome.permissions.request({origins:[origin]}))throw new Error('Разрешение не выдано');
   const registered=await chrome.scripting.getRegisteredContentScripts();const matches=[...new Set(registered.flatMap(s=>s.matches).concat(origin))];
   if(registered.length)await chrome.scripting.unregisterContentScripts({ids:registered.map(s=>s.id)});

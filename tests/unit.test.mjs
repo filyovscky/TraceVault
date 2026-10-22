@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime} from '../extension/domain.js';
+import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern} from '../extension/domain.js';
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
 test('portable paths reject traversal and Windows reserved characters',()=>{for(const bad of ['../a','/a','a\\b','C:/a','a//b','a/../x','a.','a/'])assert.throws(()=>safePath(bad));assert.deepEqual(safePath('cases/abc/captures/1.html'),['cases','abc','captures','1.html']);});
 test('conservative normalization preserves email local part and phone context',()=>{assert.equal(normalize('email','User.Name@EXAMPLE.COM'),'User.Name@example.com');assert.equal(normalize('phone','8 (900) 123-45-67'),'8 (900) 123-45-67');assert.equal(normalize('domain','ПРИМЕР.РФ'),'xn--e1afmkfd.xn--p1ai');assert.equal(normalize('person','Иван Иванов'),'Иван Иванов');});
@@ -9,3 +9,4 @@ test('event replay is ordered, schema-gated and records immutable versions',()=>
 test('export shares captures and keeps all separate evidence references',()=>{const s={captures:{a:{capture_id:'a',state:'completed',artifacts:[{artifact_id:'file'}]}},annotations:{},entities:{a:{entity_id:'1'},b:{entity_id:'2'},c:{entity_id:'3'}},refs:{}};for(let i=0;i<5;i++)s.refs[i]={reference_id:String(i),artifact_id:'file',capture_id:'a'};const out=makeExport(s,{case_id:'case'});assert.equal(out.entities.length,3);assert.equal(out.evidence.length,1);assert.equal(out.evidence_refs.length,5);assert.equal(out.relations.length,0);s.refs[0].artifact_id='bad';assert.throws(()=>makeExport(s,{}));});
 test('closed pages, incognito, pause and excluded subdomains are rejected',()=>{for(const tab of [{url:'chrome://settings'},{url:'https://x',incognito:true}])assert.throws(()=>assertWebTab(tab));assert.throws(()=>assertWebTab({url:'https://x'},{paused:true}));assert.throws(()=>assertWebTab({url:'https://a.bank.test'},{blockedDomains:['bank.test']}));});
 test('display time includes milliseconds and explicit UTC offset',()=>assert.match(localTime('2026-10-22T11:42:17.384Z'),/\.384 \(UTC[+-]\d{2}:\d{2}\)/u));
+test('host permissions do not include unsupported port components',()=>assert.equal(hostPattern('http://localhost:8123/test'),'http://localhost/*'));

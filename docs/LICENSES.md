@@ -1,0 +1,94 @@
+# Dependency license inventory
+
+Runtime: no third-party code. The capture engine is independently implemented. SingleFile is NOT distributed. TraceVault itself has no open-source license grant specified by its owner yet.
+
+Generated from installed locked package metadata; inspect notices in each package when distributing development tooling. Playwright browser binaries are test tools, not included in dist/.
+
+| Package | Version | Declared license | Scope |
+|---|---|---|---|
+| @cacheable/memory | 2.2.0 | MIT | development |
+| @cacheable/utils | 2.5.0 | MIT | development |
+| @eslint-community/eslint-utils | 4.10.1 | MIT | development |
+| @eslint-community/regexpp | 4.12.2 | MIT | development |
+| @eslint/config-array | 0.23.5 | Apache-2.0 | development |
+| @eslint/config-helpers | 0.7.0 | Apache-2.0 | development |
+| @eslint/core | 1.2.1 | Apache-2.0 | development |
+| @eslint/js | 10.0.1 | MIT | development |
+| @eslint/object-schema | 3.0.5 | Apache-2.0 | development |
+| @eslint/plugin-kit | 0.7.3 | Apache-2.0 | development |
+| @humanfs/core | 0.19.2 | Apache-2.0 | development |
+| @humanfs/node | 0.16.8 | Apache-2.0 | development |
+| @humanfs/types | 0.15.0 | Apache-2.0 | development |
+| @humanwhocodes/module-importer | 1.0.1 | Apache-2.0 | development |
+| @humanwhocodes/retry | 0.4.3 | Apache-2.0 | development |
+| @keyv/bigmap | 1.3.1 | MIT | development |
+| @keyv/serialize | 1.1.1 | MIT | development |
+| @playwright/test | 1.64.1 | Apache-2.0 | development |
+| @types/esrecurse | 4.3.1 | MIT | development |
+| @types/estree | 1.0.9 | MIT | development |
+| @types/json-schema | 7.0.15 | MIT | development |
+| acorn | 8.19.0 | MIT | development |
+| acorn-jsx | 5.3.2 | MIT | development |
+| ajv | 6.15.0 | MIT | development |
+| ajv | 8.20.0 | MIT | development |
+| balanced-match | 4.0.4 | MIT | development |
+| brace-expansion | 5.0.12 | MIT | development |
+| cacheable | 2.5.0 | MIT | development |
+| cross-spawn | 7.0.6 | MIT | development |
+| debug | 4.4.3 | MIT | development |
+| deep-is | 0.1.4 | MIT | development |
+| escape-string-regexp | 4.0.0 | MIT | development |
+| eslint | 10.13.0 | MIT | development |
+| eslint-scope | 9.1.2 | BSD-2-Clause | development |
+| eslint-visitor-keys | 3.4.3 | Apache-2.0 | development |
+| eslint-visitor-keys | 5.0.1 | Apache-2.0 | development |
+| espree | 11.2.0 | BSD-2-Clause | development |
+| esquery | 1.7.0 | BSD-3-Clause | development |
+| esrecurse | 4.3.0 | BSD-2-Clause | development |
+| estraverse | 5.3.0 | BSD-2-Clause | development |
+| esutils | 2.0.3 | BSD-2-Clause | development |
+| fast-deep-equal | 3.1.3 | MIT | development |
+| fast-json-stable-stringify | 2.1.0 | MIT | development |
+| fast-levenshtein | 2.0.6 | MIT | development |
+| fast-uri | 3.1.9 | BSD-3-Clause | development |
+| file-entry-cache | 11.1.5 | MIT | development |
+| find-up | 5.0.0 | MIT | development |
+| flat-cache | 6.1.23 | MIT | development |
+| flatted | 3.4.4 | ISC | development |
+| glob-parent | 6.0.2 | ISC | development |
+| globals | 17.13.0 | MIT | development |
+| hashery | 1.5.1 | MIT | development |
+| hookified | 1.15.1 | MIT | development |
+| hookified | 2.2.0 | MIT | development |
+| ignore | 5.3.2 | MIT | development |
+| imurmurhash | 0.1.4 | MIT | development |
+| is-extglob | 2.1.1 | MIT | development |
+| is-glob | 4.0.3 | MIT | development |
+| isexe | 2.0.0 | ISC | development |
+| json-schema-traverse | 0.4.1 | MIT | development |
+| json-schema-traverse | 1.0.0 | MIT | development |
+| json-stable-stringify-without-jsonify | 1.0.1 | MIT | development |
+| keyv | 5.6.0 | MIT | development |
+| levn | 0.4.1 | MIT | development |
+| locate-path | 6.0.0 | MIT | development |
+| minimatch | 10.2.6 | BlueOak-1.0.0 | development |
+| ms | 2.1.3 | MIT | development |
+| natural-compare | 1.4.0 | MIT | development |
+| optionator | 0.9.4 | MIT | development |
+| p-limit | 3.1.0 | MIT | development |
+| p-locate | 5.0.0 | MIT | development |
+| path-exists | 4.0.0 | MIT | development |
+| path-key | 3.1.1 | MIT | development |
+| playwright | 1.64.1 | Apache-2.0 | development |
+| playwright-core | 1.64.1 | Apache-2.0 | development |
+| prelude-ls | 1.2.1 | MIT | development |
+| punycode | 2.3.1 | MIT | development |
+| qified | 0.10.1 | MIT | development |
+| require-from-string | 2.0.2 | MIT | development |
+| shebang-command | 2.0.0 | MIT | development |
+| shebang-regex | 3.0.0 | MIT | development |
+| type-check | 0.4.0 | MIT | development |
+| uri-js | 4.4.1 | BSD-2-Clause | development |
+| which | 2.0.2 | ISC | development |
+| word-wrap | 1.2.5 | MIT | development |
+| yocto-queue | 0.1.0 | MIT | development |
