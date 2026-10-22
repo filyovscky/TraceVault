@@ -60,14 +60,15 @@
     const rect=s.getRangeAt(0).getBoundingClientRect();
     if(!host) {
       host=document.createElement('div');host.dataset.tracevaultUi='';host.style.cssText='position:fixed;z-index:2147483647;';const shadow=host.attachShadow({mode:'open'});
-      const css=document.createElement('style');css.textContent=':host{font:13px system-ui}div{display:flex;gap:2px;padding:4px;background:#18181b;color:#fafafa;border:1px solid #71717a;border-radius:4px}button{font:inherit;color:inherit;background:transparent;border:0;padding:6px;cursor:pointer}button:hover,button:focus-visible{background:#3f3f46;outline:1px solid #a1a1aa}';shadow.append(css);
+      const css=document.createElement('style');css.textContent=':host{font:13px system-ui}div{display:flex;gap:4px;padding:4px;background:#f6f6f6;color:#222;border:1px solid #b5b5b5;border-radius:4px}button{display:grid;place-items:center;color:inherit;background:transparent;border:0;border-radius:3px;width:36px;height:36px;padding:8px;cursor:pointer}svg{width:18px;height:18px;pointer-events:none}button:hover,button:focus-visible{background:#e0e0e0;outline:2px solid #705dcf}@media(prefers-color-scheme:dark){div{background:#262626;color:#dadada;border-color:#666}button:hover,button:focus-visible{background:#363636;outline-color:#a88bfa}}';shadow.append(css);
       const row=document.createElement('div');
-      for(const [action,label] of [['highlight','Выделить'],['quote','Цитата'],['note','Заметка'],['entity','Entity']]) {
-        const btn=document.createElement('button');btn.textContent=label;btn.addEventListener('pointerdown',e=>e.preventDefault());btn.addEventListener('click',()=>{chrome.runtime.sendMessage({type:'TV_ACTION',action}).catch(()=>{});host.hidden=true;});row.append(btn);
+      const paths={highlight:'m14 3 7 7-10 10-7-7zM8 17l-4 4H2m9-15 7 7',quote:'M10 6H4v7h4c0 3-2 5-4 5m16-12h-6v7h4c0 3-2 5-4 5',note:'M4 3h16v12l-6 6H4zM14 21v-6h6M8 8h8m-8 4h5',entity:'M14 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0M7 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0m14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0M12 7v5m-7 4v-4h14v4'};
+      for(const [action,label] of [['highlight',"Highlight"],['quote',"Quote"],['note',"Note"],['entity','Entity']]) {
+        const btn=document.createElement('button');btn.title=label;btn.setAttribute('aria-label',label);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const [key,value]of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[action]);svg.append(path);btn.append(svg);btn.addEventListener('pointerdown',e=>e.preventDefault());btn.addEventListener('click',()=>{chrome.runtime.sendMessage({type:'TV_ACTION',action}).catch(()=>{});host.hidden=true;});row.append(btn);
       }
       shadow.append(row);document.documentElement.append(host);
     }
-    host.style.left=Math.max(8,Math.min(rect.left,innerWidth-290))+'px';host.style.top=Math.min(innerHeight-44,rect.bottom+8)+'px';host.hidden=false;
+    host.style.left=Math.max(8,Math.min(rect.left,innerWidth-176))+'px';host.style.top=Math.min(innerHeight-52,rect.bottom+8)+'px';host.hidden=false;
   }
   document.addEventListener('pointerup',e=>{if(e.composedPath().includes(host)) return;setTimeout(toolbar,0);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape' && host) host.hidden=true;});

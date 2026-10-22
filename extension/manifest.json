@@ -1,21 +1,69 @@
 {
   "manifest_version": 3,
   "name": "TraceVault",
-  "version": "0.3.2",
-  "description": "Локальная фиксация веб-материалов с SHA-256, аннотациями и источниками Entity.",
+  "version": "0.4.0",
+  "description": "Local web evidence capture with SHA-256, annotations and source-linked entities.",
   "minimum_chrome_version": "120",
-  "permissions": ["activeTab", "tabs", "scripting", "storage", "contextMenus", "sidePanel"],
-  "optional_host_permissions": ["https://*/*", "http://*/*"],
-  "background": {"service_worker": "background.js", "type": "module"},
-  "icons": {"16":"icons/16.png","32":"icons/32.png","48":"icons/48.png","128":"icons/128.png"},
-  "action": {"default_title": "Открыть TraceVault справа", "default_icon":{"16":"icons/16.png","32":"icons/32.png"}},
-  "side_panel": {"default_path": "panel.html"},
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage",
+    "contextMenus",
+    "sidePanel"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "action": {
+    "default_title": "Open TraceVault side panel",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
   "options_page": "panel.html?workspace=1",
   "commands": {
-    "capture-page": {"suggested_key": {"default": "Ctrl+Shift+1"}, "description": "TraceVault: сохранить HTML"},
-    "capture-screen": {"suggested_key": {"default": "Ctrl+Shift+2"}, "description": "TraceVault: скриншот PNG"},
-    "open-panel": {"suggested_key": {"default": "Ctrl+Shift+3"}, "description": "TraceVault: открыть панель"},
-    "add-highlight": {"suggested_key": {"default": "Ctrl+Shift+4"}, "description": "TraceVault: выделить цитату"}
+    "capture-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+1"
+      },
+      "description": "TraceVault: Save page as HTML"
+    },
+    "capture-screen": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+2"
+      },
+      "description": "TraceVault: Capture visible area as PNG"
+    },
+    "open-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+3"
+      },
+      "description": "TraceVault: Open side panel"
+    },
+    "add-highlight": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+4"
+      },
+      "description": "TraceVault: Highlight selection"
+    }
   },
-  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'; frame-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"}
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; frame-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"
+  }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — English icon interface, 22.10.2026
+
+- All shipped interface text, runtime errors/progress, context menus, command descriptions and citation labels are English. Source content, user data, existing originals and historical journal entries are preserved.
+- Original monochrome SVG action icons with English hover/keyboard-focus tooltips and accessible names. Searchable command results and evidence titles retain readable text.
+- One-line application toolbar, matching capture/annotation grids, icon navigation with an active section heading, aligned controls, fixed header/status and a scrolling content area.
+- Grouped Settings dialog: Appearance, Capture, Annotations, Keyboard shortcuts and Storage. Apply/cancel behavior is consistent for theme, pause, limit and global annotation visibility; per-site visibility remains an immediate action. Unassigned internal browser commands are omitted.
+- Validation/errors are visible inside the active dialog. No new permissions, runtime dependencies or data-schema changes.
+
 ## 0.3.2 — текущая страница и доступ к папке, 22.10.2026
 
 - По прямому запросу пользователя полностью удалены исключения доменов: enforcement, стартовые списки, настройки и кнопка разрешения. Старые blockedDomains/allowedCaptureHosts удаляются из preferences при открытии панели.

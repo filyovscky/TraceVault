@@ -52,3 +52,9 @@ QA 0.3.2 воспроизвёл InvalidStateError на close() настояще�
 ## Источники проверки
 
 Chrome: https://developer.chrome.com/docs/capabilities/web-apis/file-system-access/ ; https://developer.chrome.com/docs/extensions/reference/api/sidePanel ; https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle ; https://developer.chrome.com/docs/extensions/reference/api/tabs . Документация не заменяет браузерный тест.
+
+## 0.4.0 interface
+
+The interface is English; archived/user content is not translated. `icons.js` owns original SVG paths, accessible action names and a shared hover/focus tooltip. It never renders source HTML. Tooltips are clamped to the viewport and attached inside an active native dialog to participate in Chrome's top layer. `i18n.js` maps stable status/entity keys to display labels; domain values, messages and evidence schemas retain their existing contracts.
+
+The panel uses a fixed application header/status and one scrolling main region. Capture and annotation rows share the same four-column geometry. `#settings` is a modal dialog; unapplied theme/pause/limit/global annotation visibility controls reset when reopened, while the theme preview is restored on close. Apply persists preferences and broadcasts actual annotation visibility. Per-site visibility and command-palette visibility are explicit immediate actions. Errors are rendered in the active dialog as well as application status. Existing IDs, keyboard commands, filesystem and inter-component message types are preserved.

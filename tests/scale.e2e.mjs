@@ -6,7 +6,7 @@ import {launch,extensionPage,chooseDirectory} from './browser-helpers.mjs';
 test('metadata scale: 2000 synthetic failed captures, pagination, Unicode search and async disk index',async()=>{
   const run=Date.now(),directory=path.resolve('output/playwright/scale-workspace-'+run),context=await launch(path.resolve('output/playwright/scale-profile-'+run));
   try{
-    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SYNTHETIC');await panel.locator('#case-title').fill('Искусственная нагрузка метаданных');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SYNTHETIC');await panel.locator('#case-title').fill('Искусственная нагрузка метаданных');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     const id=await panel.evaluate(async()=>(await import('./storage.js')).setting('activeCase'));
     const held=panel.evaluate(()=>navigator.locks.request('tracevault-disk-writer',()=>new Promise(resolve=>{window.__qaRelease=resolve;})));
     await expect.poll(()=>panel.evaluate(()=>typeof window.__qaRelease)).toBe('function');

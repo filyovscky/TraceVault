@@ -2,7 +2,7 @@
 export function snapshotDocument(maxBytes=64*1024*1024) {
   const warnings=[];
   function snapshot(doc, depth=0) {
-    if(doc.documentElement.outerHTML.length>maxBytes)throw new Error('DOM превышает лимит размера захвата');
+    if(doc.documentElement.outerHTML.length>maxBytes)throw new Error("DOM exceeds the capture size limit");
     const clone=doc.documentElement.cloneNode(true), source=[doc.documentElement,...doc.documentElement.querySelectorAll('*')], target=[clone,...clone.querySelectorAll('*')];
     for(let i=0;i<source.length;i++) {
       const a=source[i], b=target[i];
@@ -48,7 +48,7 @@ export async function buildArchive(snapshot, {signal, maxBytes=64*1024*1024, onP
   const diagnostics=[...snapshot.warnings], cache=new Map();let total=0;
   const warn=(type,url,reason)=>diagnostics.push({type,url,reason});
   const absolute=(url,base)=> {try {return new URL(url,base).href;} catch {return '';}};
-  const check=()=>{signal?.throwIfAborted();if(total>maxBytes) throw new Error('Превышен лимит размера захвата');};
+  const check=()=>{signal?.throwIfAborted();if(total>maxBytes) throw new Error("Capture size limit exceeded");};
   async function fetchResource(url,kind) {
     check();
     if(!/^https?:/u.test(url)) { if(url.startsWith('data:')) return {data:url};warn(kind,url,'Unsupported protocol or inaccessible blob');return null; }
@@ -66,7 +66,7 @@ export async function buildArchive(snapshot, {signal, maxBytes=64*1024*1024, onP
         const type=(response.headers.get('content-type')||'application/octet-stream').split(';')[0];
         const blob=new Blob(chunks,{type});
         const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);});
-        onProgress(`Ресурсы: ${cache.size}, ${Math.round(total/1024)} КБ`);
+        onProgress(`Resources: ${cache.size}, ${Math.round(total/1024)} KB`);
         return {data,text:()=>blob.text(),base:response.url};
       } catch(e) {if(signal?.aborted) throw e; warn(kind,url,e.message);return null;}
     })();cache.set(url,promise);return promise;
@@ -137,6 +137,6 @@ export async function buildArchive(snapshot, {signal, maxBytes=64*1024*1024, onP
     return '<!doctype html>\n'+doc.documentElement.outerHTML;
   }
   const html=await process(snapshot.html,snapshot.base);
-  if(new TextEncoder().encode(html).byteLength>maxBytes) throw new Error('Итоговый HTML превышает лимит размера');
+  if(new TextEncoder().encode(html).byteLength>maxBytes) throw new Error("Final HTML exceeds the size limit");
   return {html,diagnostics,total_resource_bytes:total};
 }

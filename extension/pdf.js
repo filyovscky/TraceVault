@@ -4,9 +4,9 @@ const utf16=value=>'FEFF'+[...String(value)].map(c=>{const cp=c.codePointAt(0);r
 // PDF text is limited to ASCII footer, with full Unicode attribution in Info.
 export async function pngToPdf(png,{captureId,sourceUrl,sourceSha256,capturedAt,signal,maxBytes=64*1024*1024}) {
   const bitmap=await createImageBitmap(png),width=bitmap.width,height=bitmap.height;
-  if(width*height>MAX_PIXELS){bitmap.close();throw new Error('PNG превышает лимит конвертации PDF');}
+  if(width*height>MAX_PIXELS){bitmap.close();throw new Error("PNG exceeds the PDF conversion limit");}
   const pageHeight=Math.max(1,Math.floor(width*770/547)),count=Math.ceil(height/pageHeight),objects=[],parts=[],offsets=[0];let length=0;
-  const enc=new TextEncoder(),put=value=>{const bytes=typeof value==='string'?enc.encode(value):value;parts.push(bytes);length+=bytes.byteLength;if(length>maxBytes)throw new Error('PDF превышает лимит размера');};
+  const enc=new TextEncoder(),put=value=>{const bytes=typeof value==='string'?enc.encode(value):value;parts.push(bytes);length+=bytes.byteLength;if(length>maxBytes)throw new Error("PDF exceeds the size limit");};
   const add=async data=>{const id=objects.length+1;objects.push(data);return id;};
   const stream=(header,bytes)=>[enc.encode(`<< ${header} /Length ${bytes.byteLength} >>\nstream\n`),bytes,enc.encode('\nendstream')];
   const canvas=document.createElement('canvas');canvas.width=width;

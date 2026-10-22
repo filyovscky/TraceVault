@@ -1,5 +1,39 @@
 # Фактические проверки
 
+## 0.4.0 — English icon UI
+
+### Architecture and API prototype
+
+- [UI plan](UI-0.4-PLAN.md) recorded before implementation. One original SVG stroke icon module, no remote assets, libraries, new permissions or evidence-schema changes.
+- Action controls use SVG plus English accessible names. A single viewport-clamped tooltip supports pointer hover and keyboard focus; it moves into the active dialog so Chrome's top layer does not hide it. Command-search results and record titles retain readable text.
+- Header/status remain visible while main content scrolls. Capture and annotation tools share an equal four-column grid. Settings is a native modal dialog with five named groups, real preference persistence and visible inline error feedback.
+
+### Implemented
+
+- English static UI, runtime errors/progress, Chrome menus/command descriptions, entity-type options and citation labels. Source titles, original page text, user notes, archived files and old journal entries keep their original language. The README is now English.
+- Icon actions throughout the panel, record details, dialogs and the source-page selection toolbar. Every tool has an English accessible name/description; native button keyboard behavior and existing shortcuts are preserved.
+- Settings groups: Appearance, Capture, Annotations, Keyboard shortcuts, Storage. Apply/cancel works consistently for theme, pause, size limit and global annotation visibility. Site visibility remains an immediate action. Internal unassigned `_execute_action` is omitted.
+
+### Tests and visual QA
+
+- `npm run check`: ESLint, **15/15 unit tests**, build PASS. New language audit checks the shipped HTML/JS/manifest; existing integrity, anchoring, schema and citation tests pass with English labels.
+- **13 distinct browser E2E scenarios PASS** across targeted runs (8 scenarios, then 7 with two overlapping). Coverage: English hover/focus and accessible names; grouped modal settings, invalid limits and pause; apply/cancel visibility against actual CSS Highlights; persisted preferences; unchanged Russian source/user content; real HTML disk readback and independent Node SHA-256; navigation and permission recovery; quote/entity/reference creation, edit/undo, command palette, clipboard, filters, tamper rejection, case sync, registered script restart, offline originals and interrupted recovery.
+- Native installed Chrome **155.0.8059.85**: real SIDE_PANEL runtime target; **32 main-panel + 32 Settings layout combinations** at widths 320/360/420/520 and DPR 1/1.25/1.5/2, both themes. Matching capture/annotation x/width/height and absence of horizontal overflow inside both the main scroll area and dialog are asserted. Native PNG dimensions are checked against DPR.
+- Full PNG/PDF regression: CFT 156 and installed Chrome 155 passed actual capture/conversion, frame/pixel/hash and restore assertions. Failure-boundary test passed cancellation, size limit, changing geometry, real 125% zoom with all 3000 test rows checked, and viewport PNG→PDF. Independent external Python PDF rendering was not repeated in this UI iteration.
+- [Dark panel](qa/0.4-panel-dark-320.png), [light panel](qa/0.4-panel-light-320.png), [Settings](qa/0.4-settings-dark-320.png), [hover tooltip](qa/0.4-tooltip-320.png), [dialog tooltip](qa/0.4-settings-tooltip-320.png).
+
+### Defects found and corrected
+
+- Initial role-based test found duplicate “Create case” names. The launcher is now “New case”; confirmation remains “Create case”.
+- Visual inspection found a status footer covering list controls, a raw internal Chrome command in Settings, and inconsistent global-visibility apply behavior. The scroll layout, shortcut list and preference flow were corrected and rechecked.
+- Validation errors previously appeared only behind the modal in the application footer. Active dialogs now show the actual error inline with `role=alert`.
+
+### Limits and remaining checks
+
+- Native OS picker/permission bubbles and real Windows display-scaling changes remain manual. Browser DPR emulation and installed Chrome are covered; these tests do not certify all assistive technologies or all websites.
+- Extension reload does not reliably replace UI already injected into open sites. Refresh existing source tabs after updating. Browser/OS dialogs use their own language; source content and historical evidence are deliberately not translated.
+- Existing capture/FSA/OSINTchart boundaries remain as documented below. No OCR, video, trusted timestamp or native bridge is claimed.
+
 ## Итерация 0.3.2 — папка, навигация, удаление исключений
 
 ### Диагностика и архитектура

@@ -27,7 +27,7 @@ export async function fileHandle(root, path, create = false) {
 export async function readFile(root,path) { return (await fileHandle(root,path)).getFile(); }
 export async function readVerifiedFile(root,artifact) {
   const file=await readFile(root,artifact.relative_path),bytes=await file.arrayBuffer();
-  if(file.size!==artifact.byte_length || await sha256(bytes)!==artifact.sha256)throw new Error('Контрольная сумма не совпадает: файл изменён. Просмотр и экспорт оригинала остановлены. '+artifact.relative_path);
+  if(file.size!==artifact.byte_length || await sha256(bytes)!==artifact.sha256)throw new Error("Checksum mismatch: file changed. Original preview and export blocked. "+artifact.relative_path);
   // Return an immutable snapshot: the file may change on disk after this check.
   return new Blob([bytes],{type:artifact.mime_type});
 }
@@ -36,8 +36,8 @@ export async function exists(root,path) {
   try { await readFile(root,path); return true; } catch(e) { if (e.name === 'NotFoundError') return false; throw e; }
 }
 export async function writeNew(root,path,data,mime='application/json') {
-  if (await root.queryPermission({mode:'readwrite'}) !== 'granted') throw new DOMException('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».','NotAllowedError');
-  if (await exists(root,path)) throw new Error('Файл уже существует, перезапись запрещена: '+path);
+  if (await root.queryPermission({mode:'readwrite'}) !== 'granted') throw new DOMException("Workspace access missing. Use Restore folder access.",'NotAllowedError');
+  if (await exists(root,path)) throw new Error("File already exists; overwriting is forbidden: "+path);
   const bytes = data instanceof Blob ? await data.arrayBuffer() : new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data,null,2));
   const before = await sha256(bytes);
   const started = now();
@@ -56,12 +56,12 @@ export async function writeNew(root,path,data,mime='application/json') {
       if(file.size!==0 || !await current.isSameEntry(handle)){console.error('TraceVault disk write:',path,stage,e);throw e;}
       retries++;console.warn('TraceVault: retrying fresh empty file',path,stage,retries,e.name);
       await new Promise(resolve=>setTimeout(resolve,50*retries));
-      if(await root.queryPermission({mode:'readwrite'})!=='granted')throw new DOMException('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».','NotAllowedError');
+      if(await root.queryPermission({mode:'readwrite'})!=='granted')throw new DOMException("Workspace access missing. Use Restore folder access.",'NotAllowedError');
       handle=current;
     }
   }
   const written = now(), stored = await handle.getFile(), after = await sha256(await stored.arrayBuffer());
-  if (before !== after || stored.size !== bytes.byteLength) throw new Error('Проверка записанного файла не пройдена: '+path);
+  if (before !== after || stored.size !== bytes.byteLength) throw new Error("Written file verification failed: "+path);
   return {artifact_id:uuid(), relative_path:path, mime_type:mime, byte_length:stored.size, sha256:after, created_at:started, artifact_write_started_at:started, written_at:written, verification_status:'verified_readback',time_context:clock()};
 }
 export async function probe(root) {
@@ -74,11 +74,11 @@ export async function openWorkspace(root, mode='workspace') {
   let metadata;
   if (await exists(root,'workspace.json')) {
     metadata = await readJSON(root,'workspace.json');
-    if (metadata.schema_version !== 1 || !['workspace','single_case'].includes(metadata.mode)) throw new Error('Неизвестная схема рабочей папки');
+    if (metadata.schema_version !== 1 || !['workspace','single_case'].includes(metadata.mode)) throw new Error("Unknown workspace schema");
   } else {
     // Do not silently adopt another application's populated directory.
     const entries = []; for await (const [name] of root.entries()) entries.push(name);
-    if (entries.length) throw new Error('В папке нет workspace.json и она не пуста. Выберите пустую папку или существующую рабочую область TraceVault.');
+    if (entries.length) throw new Error("Folder is not empty and has no workspace.json. Choose an empty folder or an existing TraceVault workspace.");
     metadata = {schema_version:1, workspace_id:uuid(), mode, created_at:now()};
     await writeNew(root,'workspace.json',metadata);
   }

@@ -1,7 +1,10 @@
 import {test} from 'node:test';
+import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {planTiles} from '../extension/screenshot.js';
 import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from '../extension/domain.js';
+
+test('shipped UI, manifest and runtime messages are English; archived content is external data',async()=>{for(const file of (await readdir('extension')).filter(f=>/\.(js|html|json)$/u.test(f)))assert.doesNotMatch(await readFile('extension/'+file,'utf8'),/[А-Яа-яЁё]/u,file);});
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
 test('full screenshot tiles cover both axes, clamp final overlap and reject oversized allocations',()=>{const p=planTiles(1500,2400,800,600,1.25);assert.equal(p.width,1875);assert.equal(p.height,3000);assert.equal(p.tiles.length,10);assert.deepEqual(p.tiles.at(-1),{x:700,y:1800});assert.equal(planTiles(800,600,800,600).tiles.length,1);assert.throws(()=>planTiles(10000,10000,800,600));assert.throws(()=>planTiles(500,500,0,600));assert.throws(()=>planTiles(100,100000,800,600,0.1));});
 test('portable paths reject traversal and Windows reserved characters',()=>{for(const bad of ['../a','/a','a\\b','C:/a','a//b','a/../x','a.','a/'])assert.throws(()=>safePath(bad));assert.deepEqual(safePath('cases/abc/captures/1.html'),['cases','abc','captures','1.html']);});
@@ -20,5 +23,5 @@ test('domain filter matches hosts, subdomains and IDNA; never query strings or s
 });
 test('entity filters resolve source URLs through immutable reference IDs',()=>assert.deepEqual(recordUrls({evidence_refs:['r','missing']},{r:{source_url:'https://example.org'}}),['https://example.org']));
 test('citation includes original full URL, UTC and complete checksums without inventing artifacts',()=>{
-  const record={source:{title:'Источник',final_url:'https://example.org/?token=important'},capture_id:'capture',times:{capture_started_at:'2026-10-22T11:42:17.384Z'},artifacts:[{relative_path:'captures/a.html',sha256:'a'.repeat(64)}]};const result=citation(record,'Точная цитата');assert.ok(result.includes(record.source.final_url));assert.ok(result.includes('a'.repeat(64)));assert.ok(result.includes('Точная цитата'));assert.ok(result.includes('.384Z'));assert.match(citation({...record,artifacts:[]}),/отсутствуют/u);
+  const record={source:{title:'Источник',final_url:'https://example.org/?token=important'},capture_id:'capture',times:{capture_started_at:'2026-10-22T11:42:17.384Z'},artifacts:[{relative_path:'captures/a.html',sha256:'a'.repeat(64)}]};const result=citation(record,'Точная цитата');assert.ok(result.includes(record.source.final_url));assert.ok(result.includes('a'.repeat(64)));assert.ok(result.includes('Точная цитата'));assert.ok(result.includes('.384Z'));assert.match(citation({...record,artifacts:[]}),/No verified files/u);
 });

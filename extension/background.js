@@ -1,5 +1,5 @@
 import {sha256} from './domain.js';
-const menus={quote:'Сохранить выделенный текст',highlight:'Подсветить выделение',entity:'Создать Entity из выделения',note:'Добавить заметку к выделению',image:'Сохранить изображение'};
+const menus={quote:"Save selected text",highlight:"Highlight selection",entity:"Create entity from selection",note:"Add note to selection",image:"Save image"};
 chrome.runtime.onInstalled.addListener(async()=>{
   await chrome.contextMenus.removeAll();
   for(const [id,title] of Object.entries(menus)) chrome.contextMenus.create({id,title,contexts:[id==='image'?'image':'selection'],documentUrlPatterns:['http://*/*','https://*/*']});

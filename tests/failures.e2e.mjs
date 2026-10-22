@@ -6,7 +6,7 @@ import {fixtureServer} from './fixture-server.mjs';
 test('failure boundaries: size, cancellation, denied adapter, duplicates, case switch and corrupted journal',async()=>{
   const run=Date.now(),directory=path.resolve('output/playwright/failure-workspace-'+run),context=await launch(path.resolve('output/playwright/failure-profile-'+run)),fixture=await fixtureServer();
   try{
-    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('FAIL-001');await panel.locator('#case-title').fill('Ошибки и конкурентность');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('FAIL-001');await panel.locator('#case-title').fill('Ошибки и конкурентность');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     const source=await context.newPage();await source.goto(fixture.url+'/slow');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);
     const result=await panel.evaluate(async()=>{
       const s=await import('./storage.js'),r=await import('./repository.js'),svc=await import('./service.js'),root=await s.setting('root'),workspace=await s.readJSON(root,'workspace.json'),caseId=await s.setting('activeCase'),[tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});
@@ -27,7 +27,7 @@ test('failure boundaries: size, cancellation, denied adapter, duplicates, case s
       try{await r.loadState(root,workspace,caseId);}catch(e){errors.journal=e.message;}
       return {errors,cap,duplicate,version,states:Object.values(state.captures).map(c=>c.state),otherCount:Object.keys(other.captures).length};
     });
-    expect(result.errors.size).toContain('лимит');expect(result.errors.cancel).toBe('AbortError');expect(result.errors.denied).toBe('NotAllowedError');expect(result.errors.journal).toContain('Повреждён журнал');
+    expect(result.errors.size).toContain('limit');expect(result.errors.cancel).toBe('AbortError');expect(result.errors.denied).toBe('NotAllowedError');expect(result.errors.journal).toContain('Damaged journal');
     expect(result.states).toEqual(['failed','cancelled','completed','completed']);expect(result.cap.capture_id).toBe(result.duplicate.capture_id);expect(result.cap.case_id).toBe(result.version.case_id);expect(result.version.previous_capture_id).toBe(result.cap.capture_id);expect(result.otherCount).toBe(0);
     expect(await readdir(directory)).not.toContain('denied.txt');
   }finally{await context.close();fixture.server.close();}
@@ -36,8 +36,8 @@ test('failure boundaries: size, cancellation, denied adapter, duplicates, case s
 test('single-case folder mode survives reconnect and refuses a second case',async()=>{
   const run=Date.now(),directory=path.resolve('output/playwright/single-workspace-'+run),context=await launch(path.resolve('output/playwright/single-profile-'+run));
   try{
-    const panel=await extensionPage(context);await panel.locator('#workspace-mode').selectOption('single_case');await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SINGLE');await panel.locator('#case-title').fill('Одна папка');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    const panel=await extensionPage(context);await panel.locator('#workspace-mode').selectOption('single_case');await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SINGLE');await panel.locator('#case-title').fill('Одна папка');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     expect(await readdir(directory)).toContain('case.json');expect(await readdir(directory)).not.toContain('cases');await panel.reload();await expect(panel.locator('#case-select')).toContainText('SINGLE');
-    await panel.locator('#new-case').click();await panel.locator('#case-code').fill('EXTRA');await panel.locator('#case-title').fill('Недопустимое дело');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toContainText('только одно дело');
+    await panel.locator('#new-case').click();await panel.locator('#case-code').fill('EXTRA');await panel.locator('#case-title').fill('Недопустимое дело');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toContainText('only one case');
   }finally{await context.close();}
 });

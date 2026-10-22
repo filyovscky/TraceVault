@@ -1,62 +1,70 @@
 # TraceVault
 
-Локальное Chrome MV3 расширение для фиксации веб-материалов расследований.
+A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, source URLs, timestamps and annotations. The main interface is Chrome's **side panel**, normally on the right. English UI, light/dark themes, original flat icons, no runtime dependencies or telemetry.
 
-Основной интерфейс — **Chrome Side Panel рядом с открытым сайтом**, по умолчанию справа. Светлая и тёмная темы следуют визуальному направлению Obsidian. Отдельная вкладка «Рабочая область» нужна только для расширенного просмотра.
+## Install or update
 
-## Установка на Windows 11
+1. Extract [TraceVault 0.4.0](releases/TraceVault-0.4.0.zip) to a permanent folder, or build `dist` from this repository.
+2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.0. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
+4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
+5. Use the **folder** icon to choose a workspace. The extension verifies access with a real write/read/delete probe. Choose an empty folder or an existing TraceVault workspace. Create a case using its code and title.
 
-1. Распакуйте [TraceVault-0.3.2.zip](releases/TraceVault-0.3.2.zip) в постоянную папку либо соберите `dist` из исходников. Для обновления замените файлы именно в папке загруженного расширения, нажмите перезагрузку ↻ на его карточке в `chrome://extensions`, затем переоткройте панель. Версия 0.3.2 добавляет `tabs` для актуальных URL/названия; Chrome может запросить подтверждение нового разрешения.
-2. Откройте `chrome://extensions`, включите режим разработчика, нажмите «Загрузить распакованное расширение» и выберите папку с `manifest.json`.
-3. Закрепите значок TraceVault в меню расширений. Откройте HTTP/HTTPS сайт и нажмите значок: панель откроется рядом с ним. Chrome позволяет пользователю менять сторону боковой панели в своих настройках; расширение не переопределяет это системное предпочтение.
-4. Нажмите «Выбрать папку рабочей области». Используйте пустую папку или существующий Workspace TraceVault. Доступ проверяется созданием, чтением и удалением уникального тестового файла.
-5. Создайте дело, затем нажмите «Сохранить страницу». Успех показывается после записи и повторного чтения файла с проверкой SHA-256.
+On a new site, click the extension icon or use a capture shortcut to grant temporary `activeTab`. A click inside an already-open panel does not grant that permission. The shield action grants optional annotation auto-restore for the current site. URL/title tracking works independently of capture permission and workspace access.
 
-Если панель уже открыта при переходе на новый сайт, ещё раз нажмите значок расширения для временного `activeTab`. Для автоматического восстановления выделений разрешите именно этот домен кнопкой в панели. Один клик внутри панели сам по себе не выдаёт `activeTab`. Для PNG может требоваться новое нажатие значка/горячей клавиши, даже если разрешение домена уже есть.
+## Find an action
 
-«Текущая страница» автоматически следует активной вкладке, обычным переходам и SPA-навигации. URL и название обновляются независимо от рабочей папки и права захвата. Разрешение `tabs` открывает эти метаданные; оно само по себе не разрешает читать содержимое сайта. История посещений не собирается. [Chrome Tabs API](https://developer.chrome.com/docs/extensions/reference/api/tabs).
+Hover an icon or focus it with the keyboard to see its English description. Icons have accessible names; Tab, Enter and Space remain available. **Commands** also provides a searchable list with readable action names.
 
-Предлагаемые сочетания: **Ctrl+Shift+1** — HTML, **Ctrl+Shift+2** — PNG, **Ctrl+Shift+3** — панель, **Ctrl+Shift+4** — подсветить выделение. Они не входят в стандартные сочетания Chrome для Windows; сторонние расширения, приложения и пользовательские настройки могут создавать конфликты. Настройки TraceVault показывают реальные назначения, включая «Не назначено». В существующем профиле Chrome может сохранить старые назначения: измените их на `chrome://extensions/shortcuts`. [Ограничения Commands API](https://developer.chrome.com/docs/extensions/reference/api/commands) и [клавиши Chrome](https://support.google.com/chrome/answer/157179).
+| Group | Icons, left to right |
+| --- | --- |
+| Header | Commands, open workspace tab, settings |
+| Capture | HTML document, visible-area camera, full-page PNG scan, PDF document |
+| Annotate selection | Highlight, quote, note, entity |
+| Case sections | Materials, annotations, entities, history |
 
-Внутри панели: **Ctrl+Shift+Space** — палитра команд с поиском, стрелками и Enter; **/** — поиск материалов вне текстового поля; **Ctrl+Enter** — сохранить открытый редактор аннотации; **Esc** — закрыть диалог или отменить текущий захват. Эти обработчики не устанавливаются на сайты. Палитра также открывается кнопкой «Команды».
+The active section has a labelled heading and an underlined icon. Search and filters apply only to the collection. Reset filters clears all active filters. A free note is available in Annotations. Record details provide preview, checksum verification, copy, export and other relevant actions; each has a tooltip.
 
-Фильтр «Только текущая страница» учитывает полный URL. Доменный фильтр сравнивает hostname и поддомены, Entity ищутся через источники их ссылок. «Сбросить фильтры» возвращает весь список. В карточке фиксации можно скопировать цитирование с источником, UTC, ID и полными SHA-256. Последнюю удалённую аннотацию можно вернуть кнопкой внизу панели; восстановление записывается отдельным событием, оригинал не меняется.
+Settings has five groups: **Appearance, Capture, Annotations, Keyboard shortcuts, Storage**. Use the checkmark to apply preferences. Closing the dialog discards unapplied theme/pause/size/global-visibility changes. The per-site visibility icon is an immediate action. Shortcut settings display actual Chrome assignments; unassigned internal browser actions are omitted.
 
-## Полный снимок и PDF
+| Shortcut | Action |
+| --- | --- |
+| Ctrl+Shift+1 | Save HTML |
+| Ctrl+Shift+2 | Capture visible PNG |
+| Ctrl+Shift+3 | Open side panel |
+| Ctrl+Shift+4 | Highlight selection |
+| Ctrl+Shift+Space, inside the panel | Search commands |
+| /, outside an editor | Focus collection search |
+| Ctrl+Enter, annotation editor | Save to case |
+| Esc | Close dialog or cancel capture |
 
-«Полный PNG» прокручивает корневую страницу по двум осям, сохраняет исходные кадры и собирает один PNG. «Страница в PDF» дополнительно создаёт многостраничный A4 PDF. Исходная позиция прокрутки возвращается при завершении/ошибке/отмене, если вкладка осталась на том же URL. Оверлей TraceVault временно скрывается и восстанавливается. Кадры, их порядок, координаты, времена и SHA-256 доступны в записи фиксации; файлы лежат в screenshots выбранного дела.
+Chrome or another application may reserve a shortcut. Use Settings → keyboard icon to open `chrome://extensions/shortcuts` and assign it. Existing profiles can retain earlier assignments.
 
-PDF — **растровая производная PNG**, без OCR и перевёрстки HTML. Пиксели сжимаются без потерь; исходный PNG не меняется. Карточка любого сохранённого PNG также имеет «Создать PDF». Повторная конвертация использует уже существующий PDF только после проверки обоих файлов. PDF записывается в exports, получает собственный SHA-256 и derivation с ID/хешем источника. «Копировать путь PDF» копирует относительный путь в рабочей папке; откройте файл из неё внешним просмотрщиком. Встроенного PDF-просмотра в панели нет: Chrome блокирует blob-PDF строгой CSP расширения.
+## Files and permissions
 
-Пределы: 24 млн пикселей, сторона 30000 px, 64 кадра; лимит байтов включает все кадры, итоговый PNG и PDF. Файлы, уже записанные до отказа, остаются привязаны к failed/cancelled capture. Бесконечные ленты, виртуальные списки и отдельные вложенные scroll-контейнеры не гарантируются. Изменение геометрии/масштаба/URL или активной вкладки останавливает операцию. Sticky/fixed элементы могут повторяться, это отмечается в диагностике. Последовательный захват помечается partial, он не является атомарным снимком сайта во времени. Дробный масштаб проверен при настоящем zoom Chrome 125%; эмуляция viewport, не совпадающая с PNG, отклоняется.
+Primary data stays in the selected workspace: `workspace.json`, `cases/<UUID>/case.json`, `events`, `captures`, `screenshots`, `attachments`, `exports`. Single-case mode omits the cases level. Copy the whole workspace for backup or transfer. Browser storage holds folder handles, preferences, annotation cache and explicit pending commands; it does not replace primary files.
 
-## Цитаты, заметки и Entity
+If Chrome expires folder permission, **Save page as HTML** requests access and reconnects the previous case. The **key** icon restores access explicitly. If denied, use the folder icon to select the same workspace again. Chrome controls permission lifetime; choose “Allow on every visit” if offered. Native permission prompts require your action. Re-selecting a folder does not repair damaged metadata.
 
-Выделите текст вне полей ввода → панель на сайте, контекстное меню или кнопка TraceVault. Без архивирования источник имеет явный статус `live_only`. Чтобы связать цитату с конкретным HTML, нажмите «Сначала сохранить страницу и привязать цитату». Проверяется наличие однозначной цитаты в записанном архиве. Уже созданные ссылки не переводятся на новые версии автоматически.
+All new files are immutable and verified by reading back their size and complete SHA-256. Preview/export verify again and stop if a file changed. A transient FSA InvalidStateError can retry at most twice, only for the same fresh empty file created by that operation. Existing/nonempty files and quota/permission failures are never retried. Corrupt journals block further changes. Interrupted captures remain explicitly interrupted; unfinished files are not reported as verified evidence.
 
-Подсветка использует CSS Highlight API, не заменяет текстовые узлы. Глобальный переключатель и «Скрыть на этом сайте» убирают её и компактную панель. При отключении всего расширения обновите сайт: Chrome не гарантирует мгновенное удаление уже внесённых визуальных элементов. Изменение заметки/цвета/скрытие не меняет оригинальные HTML/PNG.
+There are **no excluded-domain lists**. Incognito capture and the pause setting remain separate controls. Source text, titles, quotes, notes, existing originals and historical events retain their original language.
 
-## Где данные и как восстановить
+## Capture and annotations
 
-В выбранной папке: `workspace.json`, `cases/<UUID>/case.json`, оригиналы в captures/screenshots/attachments, события в events, экспорт в exports. В режиме «одна папка — одно дело» уровень cases отсутствует. На странице нет каталога assets: один архив = один HTML.
+HTML capture uses our DOM/inline-resource engine. Password and editable-field values are cleared; visible personal data can still be included. Offline archives use a strict CSP and sandboxed preview. Cross-origin frames, DRM/video/WebGL, closed shadow DOM, virtualized lists and complex authenticated applications remain best effort; diagnostics record incompleteness.
 
-IndexedDB хранит handle папки и настройки. Chrome storage хранит очередь явных команд и кеш аннотаций. Эти данные не заменяют файлы на диске. Если Chrome сбросил разрешение, нажатие «Сохранить страницу» запросит доступ и подключит прежнее дело перед записью. Кнопка «Разрешить доступ» также доступна вверху панели. При отказе выберите эту же папку через «Сменить папку»; оригиналы остаются на диске.
+Full PNG scrolls both axes, keeps original frames and their coordinates/timestamps/SHA-256, stitches a PNG and restores scroll/overlays. Capture stops if the URL, active tab, zoom or geometry changes. Limits: 24 million pixels, 30000 px per side, 64 frames, configurable byte limit (64 MB default). Fixed elements may repeat; sequential capture is not an atomic snapshot in time.
 
-В поддерживаемом диалоге Chrome выберите «Разрешать при каждом посещении» / “Allow on every visit”, если этот вариант предложен. Браузер управляет сроком разрешения, расширение не может принудительно сделать его постоянным. Нативный диалог требует действия пользователя; фоновая команда может попросить нажать кнопку в панели. [Постоянные разрешения File System Access в Chrome](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api).
+PDF is a lossless raster A4 derivative of a verified PNG, without OCR or HTML reflow. It has its own SHA-256 and source derivation. Open it from the workspace in an external viewer; blob-PDF preview is not supported by the extension's strict CSP.
 
-После очистки профиля/переустановки выберите существующую папку; дело восстанавливается из файлов. Для переноса/резервной копии копируйте весь Workspace, а в single_case — всю папку дела.
+Annotations use CSS Highlights, without rewriting page text or saved originals. An unarchived reference is marked **Live page only**. Use the archive-and-link icon in the editor to bind a quote to a verified HTML capture. Edits, hide and undo are journal events; existing evidence references remain pinned to their original version.
 
-Прерванные операции получают `interrupted`; оригиналы не перезаписываются. Повтор создаёт новую фиксацию. Неполные файлы не объявляются подтверждёнными. При повреждённом/пропущенном событии новые изменения блокируются: сначала сделайте резервную копию и восстановите журнал. Удаление оригиналов интерфейсом этой версии не предусмотрено.
+## OSINTchart and build
 
-## Проверка и экспорт
+Export writes a versioned interchange JSON to the case's exports folder. It is not an `.oscase` file. The [Python adapter](adapters/osintchart_import.py) targets the real OSINTchart CaseService/schema 2 and supports preview, explicit confirmation, repeat imports and conflict detection. It is not installed in the OSINTchart GUI and has no native/HTTP bridge.
 
-Карточка показывает UTC, локальное время с миллисекундами, часовой пояс, начало/конец/запись, размер и SHA-256. «Проверить хеш» снова читает диск. Перед просмотром и экспортом оригинала размер и SHA-256 сверяются автоматически; при подмене файла операция блокируется. Системные часы не являются независимой меткой времени. Экспорт оригинала создаёт проверенную копию в exports выбранного дела.
-
-«Экспорт JSON» пишет версионированный пакет OSINTchart в exports. Это **обменный формат**, не файл `.oscase`. In-process [адаптер](adapters/osintchart_import.py) проверен с настоящим CaseService: preview → подтверждение → импорт, повтор без дублей, отказ при конфликте. Он не установлен в GUI OSINTchart и не предоставляет Native Messaging/HTTP bridge. Пакет переносится вместе с оригиналами в Workspace.
-
-## Сборка и тесты
-
-Требуется Node.js 24. Python нужен только для ZIP и тестов адаптера.
+Requires Node.js 24; Python is used for ZIP packaging and adapter QA.
 
 ```powershell
 npm ci
@@ -64,20 +72,8 @@ npm run check
 npx playwright install chromium
 npm run test:e2e
 python scripts/package.py
-# Отдельно, с настоящим локальным checkout OSINTchart и его зависимостями:
-python tests/test_osintchart_adapter.py C:/path/to/osintchart
 ```
 
-E2E создают отдельные профили и реальные папки в output/playwright. Профиль пользователя не изменяется. Выбор каталога автоматизируется передачей настоящего FSA handle через CDP drag-and-drop; только тестовый профиль заранее допускает запись. Тест постоянного доступа к домену использует копию расширения с разрешением исключительно loopback-домена. Нативные permission dialogs не покрываются этими автоматическими тестами. Native Chrome test использует установленный Chrome по стандартному Windows пути; на другой системе запускайте остальные тесты с `--grep-invert "installed Chrome"`.
+E2E uses isolated profiles and actual disk folders under `output/playwright`. Directory selection is automated with a native FSA handle supplied by CDP; only the QA profile pre-allows writes. Native OS picker/permission bubbles are not automated. The installed-Chrome tests use the standard Windows path; elsewhere add `--grep-invert "installed Chrome"`.
 
-Сборка не скачивает исполняемый код. Runtime зависимостей нет; SingleFile не включён. [Лицензии dev-зависимостей](docs/LICENSES.md). Сборка ZIP детерминирована при одинаковом dist/Python; SHA-256 рядом с архивом.
-
-## Статус и границы
-
-Рабочая версия 0.3.2, кандидат P0. [Матрица требований](docs/P0-STATUS.md) показывает оставшиеся ручные проверки. Архивирование — best effort: cross-origin iframe, DRM/video/WebGL, закрытый shadow DOM и виртуальные списки не обещаются; неполнота фиксируется. Лимит по умолчанию 64 МБ. Скрипты/сетевые загрузки в архиве ограничены CSP; просмотрщик дополнительно изолирован sandbox. Входные поля очищаются, но видимый текст авторизованной страницы может содержать персональные данные.
-
-Исключений доменов больше нет: удалены списки, блокировки и кнопки исключений; старые настройки автоматически очищаются. Это изменение по прямому указанию пользователя заменяет требование исходного ТЗ о стартовых исключениях. Доменный фильтр списка материалов только помогает искать сохранённое. Инкогнито и переключатель паузы остаются отдельными ограничениями.
-
-Полный PNG и растровый PDF добавлены в 0.3.0. Остальные P1/P2 (OCR, diff, видео, native bridge, доверенные timestamps, шифрование) не объявлены реализованными.
-
-[Спецификация](docs/SPECIFICATION_RU.md) · [Архитектура](docs/ARCHITECTURE.md) · [Совместимость](docs/COMPATIBILITY.md) · [Фактические проверки](docs/TEST-REPORT.md) · [Скриншоты](docs/qa/README.md)
+SingleFile is not bundled. There are no runtime third-party dependencies. [Dependency licenses](docs/LICENSES.md), [architecture](docs/ARCHITECTURE.md), [acceptance limits](docs/P0-STATUS.md), [test results](docs/TEST-REPORT.md), [UI plan](docs/UI-0.4-PLAN.md), [screenshots](docs/qa/README.md). Earlier engineering logs and the original specification remain in Russian. P0 is a tested MVP candidate; OCR, diff, video, trusted timestamps, encryption and a native bridge are not implemented.

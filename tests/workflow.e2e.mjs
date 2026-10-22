@@ -11,7 +11,7 @@ test('P0: three archives, PNG, original image, immutable references, offline, re
   const fixture=await fixtureServer();let context=await launch(profile);
   try {
     let panel=await extensionPage(context);const errors=[];panel.on('pageerror',e=>errors.push(e.message));
-    await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('INV-QA');await panel.locator('#case-title').fill('Проверка реального диска');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('INV-QA');await panel.locator('#case-title').fill('Verification реального диска');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();
     const id=new URL(panel.url()).host;await invokeExtension(context,source,id);
     const sourceTab=await panel.evaluate(async()=>(await chrome.tabs.query({active:true,lastFocusedWindow:true}))[0].id);
@@ -59,11 +59,10 @@ test('P0: three archives, PNG, original image, immutable references, offline, re
     const interruptedId=await panel.evaluate(async({caseId,record})=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),workspace=await s.readJSON(root,'workspace.json'),id=crypto.randomUUID();await s.exclusive(()=>r.append(root,workspace,caseId,'capture_started','captures',{...record,capture_id:id,evidence_number:'EVD-000006',state:'writing',capture_status:'pending',source:{...record.source,title:'Прерванная операция QA'},artifacts:[]}));return id;},{caseId:current,record:records[2]});
     expect(errors).toEqual([]);await context.close();context=await launch(profile);panel=await extensionPage(context);await expect(panel.locator('#case-select')).toContainText('INV-QA');
     const recovered=await panel.evaluate(async caseId=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),workspace=await s.readJSON(root,'workspace.json');return r.loadState(root,workspace,caseId);},current);expect(recovered.captures[interruptedId].state).toBe('interrupted');expect(recovered.entities[entity.entity_id].evidence_refs).toEqual(entity.evidence_refs);
-    await panel.locator('#settings-toggle').click();
     for(const theme of ['light','dark'])for(const width of [320,360,420,520]) {
-      await panel.setViewportSize({width,height:1000});await panel.locator('#theme').selectOption(theme);await panel.locator('#settings-toggle').click();
+      await panel.setViewportSize({width,height:1000});await panel.locator('#settings-toggle').click();await panel.locator('#theme').selectOption(theme);await panel.locator('#save-settings').click();
       await panel.screenshot({path:path.resolve(`output/playwright/${theme}-${width}.png`),fullPage:true});
-      expect(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await panel.locator('#settings-toggle').click();
+      expect(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     console.log('WORKFLOW DIRECTORY',directory,'FILES',await readdir(path.join(directory,'cases',current,'captures')));
   } finally {await context.close();fixture.server.close();}

@@ -6,7 +6,7 @@ test('public safe sites: three independent standalone HTML files',async()=>{
   test.setTimeout(120000);
   const run=Date.now(),directory=path.resolve('output/playwright/public-workspace-'+run),context=await launch(path.resolve('output/playwright/public-profile-'+run));
   try{
-    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('PUBLIC-QA');await panel.locator('#case-title').fill('Публичные безопасные тестовые фиксации');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
+    const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('PUBLIC-QA');await panel.locator('#case-title').fill('Публичные безопасные тестовые фиксации');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     const source=await context.newPage(),records=[];
     for(const url of ['https://example.com/','https://example.org/','https://example.net/']){
       await source.goto(url,{waitUntil:'domcontentloaded',timeout:30000});await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);

@@ -26,7 +26,7 @@ test('FSA retry recovers an empty new file, caps attempts and never rewrites non
         return {artifact,attempts,errors};
       }finally{FileSystemFileHandle.prototype.createWritable=original;}
     });
-    expect(result.attempts).toEqual({'retry.json':3,'quota.json':1,'always.json':3,'nonempty.json':1});expect(result.errors).toMatchObject({'quota.json':'QuotaExceededError','always.json':'InvalidStateError','nonempty.json':'InvalidStateError',denied:'NotAllowedError'});expect(result.errors.existing).toContain('перезапись запрещена');
+    expect(result.attempts).toEqual({'retry.json':3,'quota.json':1,'always.json':3,'nonempty.json':1});expect(result.errors).toMatchObject({'quota.json':'QuotaExceededError','always.json':'InvalidStateError','nonempty.json':'InvalidStateError',denied:'NotAllowedError'});expect(result.errors.existing).toContain('overwriting is forbidden');
     const retry=await readFile(path.join(directory,'retry.json'));expect(retry.toString()).toBe('verified retry');expect(createHash('sha256').update(retry).digest('hex')).toBe(result.artifact.sha256);expect(await readFile(path.join(directory,'nonempty.json'),'utf8')).toBe('preserved contents');await expect(readFile(path.join(directory,'denied.json'))).rejects.toThrow();
   }finally{await context.close();}
 });

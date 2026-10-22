@@ -6,8 +6,8 @@ import {fixtureServer} from './fixture-server.mjs';
 test('installed Chrome 155: capture APIs, panel config, light/dark and 32 HiDPI layouts',async()=>{
   const run=Date.now(),profile=path.resolve('output/playwright/native-profile-'+run),context=await launch(profile,{installed:true}),fixture=await fixtureServer();
   try{
-    const panel=await extensionPage(context);await chooseDirectory(panel,path.resolve('output/playwright/native-workspace-'+run));await panel.locator('#case-code').fill('CHROME-155');await panel.locator('#case-title').fill('Проверка установленного Chrome');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Дело создано');
-    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#refresh-source').click();await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Сохранено · EVD-000001',{timeout:25000});
+    const panel=await extensionPage(context);await chooseDirectory(panel,path.resolve('output/playwright/native-workspace-'+run));await panel.locator('#case-code').fill('CHROME-155');await panel.locator('#case-title').fill('Verification установленного Chrome');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
+    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#refresh-source').click();await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:25000});
     const options=await panel.evaluate(()=>chrome.sidePanel.getOptions({}));expect(options.path).toBe('panel.html');expect(options.enabled).toBe(true);
     const contexts=await panel.evaluate(()=>chrome.runtime.getContexts({contextTypes:['SIDE_PANEL']}));expect(contexts.length).toBe(1);
     const browserCDP=await context.browser().newBrowserCDPSession(),targets=await browserCDP.send('Target.getTargets',{filter:[{}]});
@@ -26,8 +26,8 @@ test('installed Chrome 155: capture APIs, panel config, light/dark and 32 HiDPI 
     }
     await sideCommand('Runtime.runIfWaitingForDebugger');
     const actual=await sideCommand('Runtime.evaluate',{expression:'({width:innerWidth,url:location.href,picker:typeof showDirectoryPicker,html:document.querySelector("header strong").textContent})',returnByValue:true});expect(actual.result.value.html).toBe('TraceVault');expect(actual.result.value.picker).toBe('function');
-    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("folder-state").textContent',returnByValue:true});return result.result.value;},{timeout:15000}).toContain('Доступ к записи');
-    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("status").textContent',returnByValue:true});return result.result.value;}).toBe('Рабочая папка подключена');
+    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("folder-state").textContent',returnByValue:true});return result.result.value;},{timeout:15000}).toContain('Read/write access');
+    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("status").textContent',returnByValue:true});return result.result.value;}).toBe('Workspace connected');
     await source.goto(fixture.url.replace('127.0.0.1','localhost')+'/side-panel-navigation');
     await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("source-url").textContent',returnByValue:true});return result.result.value;}).toBe(source.url());
     await source.evaluate(()=>{history.pushState({},'','/side-panel-spa');document.title='Side Panel SPA';});
@@ -38,10 +38,14 @@ test('installed Chrome 155: capture APIs, panel config, light/dark and 32 HiDPI 
     for(const theme of ['light','dark'])for(const width of [320,360,420,520])for(const dpr of [1,1.25,1.5,2]){
       await panel.setViewportSize({width,height:1000});
       await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:dpr,mobile:false});
-      await panel.locator('#settings-toggle').click();await panel.locator('#theme').selectOption(theme);await panel.locator('#settings-toggle').click();
+      await panel.locator('#settings-toggle').click();await panel.locator('#theme').selectOption(theme);await panel.locator('#save-settings').click();
       const metrics=await panel.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,height:Math.max(document.documentElement.scrollHeight,innerHeight),dpr:devicePixelRatio}));expect(metrics.width).toBe(width);expect(metrics.scroll).toBeLessThanOrEqual(width);expect(metrics.dpr).toBe(dpr);
       const screenshot=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.height,scale:1}}),png=Buffer.from(screenshot.data,'base64');expect(png.readUInt32BE(16)).toBe(Math.round(width*dpr));
       await writeFile(path.resolve(`output/playwright/native-${theme}-${width}-${dpr}.png`),png);layouts.push({theme,...metrics,pixel_width:png.readUInt32BE(16)});
+      const grids=await panel.locator('.tool-grid').evaluateAll(rows=>rows.map(row=>[...row.children].map(b=>{const r=b.getBoundingClientRect();return {x:r.x,width:r.width,height:r.height};})));expect(grids[0]).toEqual(grids[1]);expect(await panel.locator('main').evaluate(n=>n.scrollWidth<=n.clientWidth)).toBe(true);
+      await panel.locator('#settings-toggle').click();expect(await panel.locator('#settings').evaluate(n=>n.scrollWidth<=n.clientWidth)).toBe(true);await expect(panel.locator('#save-settings')).toBeVisible();
+      if(width===320 && dpr===2 || width===360 && dpr===1){const modal=await cdp.send('Page.captureScreenshot',{format:'png'});await writeFile(path.resolve(`output/playwright/0.4-settings-${theme}-${width}-${dpr}.png`),Buffer.from(modal.data,'base64'));}
+      await panel.keyboard.press('Escape');
     }
     await writeFile(path.resolve('output/playwright/native-layouts.json'),JSON.stringify({browser:await browserCDP.send('Browser.getVersion'),layouts},null,2));await cdp.detach();await browserCDP.detach();
   }finally{await context.close();fixture.server.close();}

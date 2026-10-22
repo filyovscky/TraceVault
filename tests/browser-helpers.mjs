@@ -40,5 +40,5 @@ export async function chooseDirectory(page,directory) {
   await expect.poll(()=>page.evaluate(()=>window.__qaDirectory?.kind)).toBe('directory');
   await page.evaluate(()=>{window.showDirectoryPicker=async()=>{await window.__qaDirectory.requestPermission({mode:'readwrite'});return window.__qaDirectory;};});
   await page.locator('#pick-root').click();
-  await expect(page.locator('#folder-state')).toContainText('Доступ к записи');
+  await expect(page.locator('#folder-state')).toContainText('Read/write access');
 }
