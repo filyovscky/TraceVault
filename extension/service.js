@@ -1,5 +1,7 @@
 import {VERSION, now, uuid, clock, assertWebTab, makeExport, normalize, sha256,locateQuote} from './domain.js';
-import {writeNew, readFile, exclusive} from './storage.js';
+import {writeNew, readFile, readVerifiedFile, exclusive} from './storage.js';
+import {fullScreenshot,screenshot} from './screenshot.js';
+import {pngToPdf} from './pdf.js';
 import {append, casePath, loadState} from './repository.js';
 import {snapshotDocument, buildArchive} from './capture.js';
 
@@ -25,7 +27,7 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
     if(state.captures[id]) return state.captures[id];
     const sequence=Object.keys(state.captures).length+1;
     const start=now(),monotonic=performance.now();
-    let record={schema_version:1,capture_id:id,evidence_number:'EVD-'+String(sequence).padStart(6,'0'),case_id:caseId,kind:kind==='page'?'webpage':kind==='screen'?'screenshot':'image',source:{original_url:tab.url,final_url:tab.url,title:tab.title || tab.url,origin:new URL(tab.url).origin},times:{capture_started_at:start,first_seen_at:Object.values(state.captures).find(c=>c.source.original_url===tab.url)?.times.first_seen_at || start,...clock()},state:'queued',capture_status:'pending',collector_version:VERSION,artifacts:[],warnings:[],previous_capture_id:Object.values(state.captures).filter(c=>c.source.final_url===tab.url).at(-1)?.capture_id || null};
+    let record={schema_version:1,capture_id:id,evidence_number:'EVD-'+String(sequence).padStart(6,'0'),case_id:caseId,kind:kind==='page'?'webpage':kind==='image'?'image':'screenshot',capture_request:kind,source:{original_url:tab.url,final_url:tab.url,title:tab.title || tab.url,origin:new URL(tab.url).origin},times:{capture_started_at:start,first_seen_at:Object.values(state.captures).find(c=>c.source.original_url===tab.url)?.times.first_seen_at || start,...clock()},state:'queued',capture_status:'pending',collector_version:VERSION,artifacts:[],warnings:[],previous_capture_id:Object.values(state.captures).filter(c=>c.source.final_url===tab.url).at(-1)?.capture_id || null};
     const save=async(action,patch)=>{record={...record,...patch};await append(root,workspace,caseId,action,'captures',record);onProgress(record.state);};
     await save('capture_started',{state:'capturing'});
     let hidden=false;
@@ -50,13 +52,24 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
         const reader=response.body.getReader(),chunks=[];let bytes=0;
         try {for(;;){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>(settings.maxBytes || 64*1024*1024))throw new Error('Изображение превышает лимит');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}
         payload=new Blob(chunks,{type:mime});folder='attachments';metadata={capture_method:'original-image-fetch',image_source_url:imageUrl,image_final_url:response.url};
+      } else if(['full','pdf'].includes(kind)) {
+        let bytes=0;const limit=settings.maxBytes || 64*1024*1024;
+        const full=await fullScreenshot(tab,{signal,onProgress,onFrame:async(blob,frame)=>{
+          signal?.throwIfAborted();bytes+=blob.size;if(bytes>limit)throw new Error('Кадры превышают лимит размера');
+          const artifact=await writeNew(root,casePath(workspace,caseId)+`screenshots/${id}__frame${String(frame.index).padStart(3,'0')}.png`,blob,'image/png');artifact.capture_id=id;artifact.kind='screenshot_frame';
+          record.times.artifact_write_started_at ||= artifact.artifact_write_started_at;
+          await save('frame_written',{artifacts:[...record.artifacts,artifact],frames:[...(record.frames || []),{...frame,artifact_id:artifact.artifact_id,sha256:artifact.sha256}]});
+          return {artifact_id:artifact.artifact_id,sha256:artifact.sha256};
+        }});
+        if(bytes+full.blob.size>limit)throw new Error('Кадры и полный PNG превышают лимит размера');
+        payload=full.blob;mime='image/png';ext='png';folder='screenshots';metadata=full.metadata;record.warnings=full.warnings;
       } else {
         const [active]=await chrome.tabs.query({active:true,windowId:tab.windowId});if(active.id!==tabId) throw new Error('Для скриншота вкладка должна оставаться активной');
         const [{result:viewport}]=await chrome.scripting.executeScript({target:{tabId},func:()=>({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,url:location.href})});
         if(viewport.url!==tab.url) throw new Error('URL изменился перед скриншотом');
-        const png=await chrome.tabs.captureVisibleTab(tab.windowId,{format:'png'});
+        const png=await screenshot(tab,signal);
         const [after]=await chrome.tabs.query({active:true,windowId:tab.windowId});if(after.id!==tabId) throw new Error('Активная вкладка изменилась во время скриншота');
-        payload=await (await fetch(png)).blob();mime='image/png';ext='png';folder='screenshots';
+        payload=png;mime='image/png';ext='png';folder='screenshots';
         const bitmap=await createImageBitmap(payload);metadata={viewport,pixel_width:bitmap.width,pixel_height:bitmap.height,page_zoom:await chrome.tabs.getZoom(tabId),capture_method:'chrome.tabs.captureVisibleTab'};bitmap.close();
       }
       signal?.throwIfAborted();
@@ -68,10 +81,17 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
         await append(root,workspace,caseId,'clock_anomaly',null,null,{capture_id:id,wall_elapsed_ms:wallElapsed,monotonic_elapsed_ms:record.duration_ms});
       }
       await save('capture_writing',{state:'writing'});
+      const payloadBytes=payload instanceof Blob?payload.size:new TextEncoder().encode(payload).byteLength;
+      if(payloadBytes+record.artifacts.reduce((n,a)=>n+a.byte_length,0)>(settings.maxBytes || 64*1024*1024))throw new Error('Материалы захвата превышают лимит размера');
       const path=casePath(workspace,caseId)+`${folder}/${id}.${ext}`;
-      const artifact=await writeNew(root,path,payload,mime);artifact.capture_id=id;artifact.kind=kind==='page'?'single_html':kind==='image'?'original_image':'viewport_png';
-      record.times.artifact_write_started_at=artifact.artifact_write_started_at;record.times.artifact_written_at=artifact.written_at;record.times.record_created_at=now();
-      await save('artifact_written',{state:'verifying',artifacts:[artifact]});
+      const artifact=await writeNew(root,path,payload,mime);artifact.capture_id=id;artifact.kind=kind==='page'?'single_html':kind==='image'?'original_image':['full','pdf'].includes(kind)?'full_page_png':'viewport_png';
+      record.times.artifact_write_started_at ||= artifact.artifact_write_started_at;record.times.artifact_written_at=artifact.written_at;record.times.record_created_at=now();
+      await save('artifact_written',{state:'verifying',artifacts:[artifact,...record.artifacts]});
+      if(kind==='pdf'){
+        onProgress('Конвертация полного PNG в PDF…');
+        const pdf=await writePdf(root,workspace,record,artifact,payload,settings.maxBytes || 64*1024*1024,signal);
+        record.times.artifact_written_at=pdf.written_at;await save('pdf_created',{artifacts:[artifact,pdf,...record.artifacts.filter(a=>a.artifact_id!==artifact.artifact_id)]});
+      }
       signal?.throwIfAborted();
       await save('capture_completed',{state:record.warnings.length?'partial':'completed',capture_status:record.warnings.length?'partial':'complete'});
       return record;
@@ -80,6 +100,21 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
       try {await save('capture_failed',patch);} catch { /* disk failure: pending event remains recoverable */ }
       throw e;
     } finally {if(hidden) await chrome.tabs.sendMessage(tabId,{type:'TV_HIDE',hidden:false}).catch(()=>{});}
+  });
+}
+async function writePdf(root,workspace,record,source,png,limit,signal) {
+  const used=record.artifacts.reduce((n,a)=>n+a.byte_length,0),converted=await pngToPdf(png,{captureId:record.capture_id,sourceUrl:record.source.final_url,sourceSha256:source.sha256,capturedAt:record.times.capture_started_at,signal,maxBytes:Math.max(0,limit-used)});
+  signal?.throwIfAborted();const artifact=await writeNew(root,casePath(workspace,record.case_id)+`exports/${uuid()}__${record.capture_id}.pdf`,converted.blob,'application/pdf');
+  return {...artifact,capture_id:record.capture_id,kind:'derived_pdf',derivation:{source_artifact_id:source.artifact_id,source_sha256:source.sha256,method:converted.method,page_count:converted.pageCount,searchable_text:false}};
+}
+export async function convertScreenshotToPdf(root,workspace,caseId,captureId,artifactId,settings={}) {
+  return exclusive(async()=>{
+    const state=await loadState(root,workspace,caseId),record=state.captures[captureId],source=record?.artifacts.find(a=>a.artifact_id===artifactId);
+    if(!source || source.mime_type!=='image/png' || source.kind==='screenshot_frame')throw new Error('Выберите сохранённый PNG');
+    const png=await readVerifiedFile(root,source),prior=record.artifacts.find(a=>a.kind==='derived_pdf' && a.derivation?.source_artifact_id===artifactId);
+    if(prior){await readVerifiedFile(root,prior);return prior;}
+    const pdf=await writePdf(root,workspace,record,source,png,settings.maxBytes || 64*1024*1024);
+    await append(root,workspace,caseId,'pdf_created','captures',{...record,artifacts:[...record.artifacts,pdf]});return pdf;
   });
 }
 export async function saveAnnotation({root,workspace,caseId,tabId,selection,note='',type='text_highlight',color='amber',author='local',captureId=null}) {

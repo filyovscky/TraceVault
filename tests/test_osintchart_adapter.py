@@ -47,6 +47,19 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply_plan(self.service, self.package, plan, confirmed=True)
 
+    def test_full_png_frames_and_derived_pdf_are_preserved(self):
+        source = self.package["artifacts"][0]
+        source.update(kind="full_page_png", mime_type="image/png", relative_path="screenshots/full.png")
+        pdf = {"artifact_id": str(uuid4()), "capture_id": self.capture_id, "kind": "derived_pdf", "mime_type": "application/pdf", "relative_path": "exports/derived.pdf", "sha256": "b" * 64, "derivation": {"source_artifact_id": source["artifact_id"], "source_sha256": source["sha256"], "searchable_text": False}}
+        frame = {"artifact_id": str(uuid4()), "capture_id": self.capture_id, "kind": "screenshot_frame", "relative_path": "screenshots/frame000.png", "sha256": "c" * 64}
+        self.package["artifacts"].extend([pdf, frame])
+        self.package["evidence"][0].update(kind="screenshot", capture_scope="full_page", frames=[{"index": 0, "scroll_y": 0, "artifact_id": frame["artifact_id"]}])
+        apply_plan(self.service, self.package, preview(self.service, self.package), confirmed=True)
+        registry = self.service.case.attributes["tracevault"][self.case_id]
+        self.assertIn(pdf["artifact_id"], registry["artifacts"])
+        self.assertEqual(registry["artifacts"][pdf["artifact_id"]]["derivation"]["source_sha256"], source["sha256"])
+        self.assertFalse(registry["artifacts"][pdf["artifact_id"]]["derivation"]["searchable_text"])
+
     def test_conflict_does_not_overwrite_analyst_or_evidence(self):
         apply_plan(self.service, self.package, preview(self.service, self.package), confirmed=True)
         first = next(iter(self.service.case.entities.values()))

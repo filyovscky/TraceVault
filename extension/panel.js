@@ -1,7 +1,7 @@
 import {setting,openWorkspace,exclusive,readJSON,readVerifiedFile,writeNew,probe} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
 import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation} from './domain.js';
-import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites} from './service.js';
+import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
 const $=id=>document.getElementById(id);
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
@@ -89,7 +89,7 @@ async function runCapture(kind='page',command=null) {
     if(c.caseId===activeCase){await refresh();showCapture(result.capture_id);}return result;
   } finally {busy=false;controller=null;$('cancel').hidden=true;setBusy(false);await refresh();}
 }
-function setBusy(value) {for(const id of ['capture-page','capture-screen','archive-first','pick-root','change-root'])$(id).disabled=value;}
+function setBusy(value) {for(const id of ['capture-page','capture-screen','capture-full','capture-pdf','archive-first','pick-root','change-root'])$(id).disabled=value;}
 async function beginAnnotation(actionName,command=null) {
   await canWrite();const c=context(),sourceId=command?.tabId || tab?.id;if(command?.caseId)c.caseId=command.caseId;
   let data=null;
@@ -149,7 +149,7 @@ function renderList() {
     const id=row.capture_id || row.annotation_id || row.entity_id || row.event_id,item=el('div',undefined,'item'+(selectedId===id?' selected':''));item.setAttribute('role','listitem');
     const b=button('',()=>view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
     let title,meta;
-    if(view==='captures'){title=`${row.pinned?'Закреплено · ':''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.kind==='screenshot'?'PNG':'Изображение'} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
+    if(view==='captures'){title=`${row.pinned?'Закреплено · ':''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?'Полный PNG':row.kind==='screenshot'?'PNG':'Изображение'} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
     else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · не подтверждено · ${row.evidence_refs.length} ист. · ${localTime(row.created_at)}`;}
     else {title=row.action;meta=localTime(row.recorded_at);}
@@ -174,13 +174,15 @@ function showCapture(id) {
   field(dl,'Название',c.source.title);field(dl,'Статус',t(c.state));field(dl,'Исходный URL',c.source.original_url);field(dl,'Конечный URL',c.source.final_url);
   for(const [key,label] of Object.entries({capture_started_at:'Начало захвата',capture_finished_at:'Конец получения данных',artifact_write_started_at:'Начало записи файла',artifact_written_at:'Файл записан',record_created_at:'Запись индекса',first_seen_at:'Первое обнаружение'})) {field(dl,label,localTime(c.times[key]));if(c.times[key])field(dl,label+' · UTC',c.times[key]);}
   field(dl,'Часы',`${c.times.clock_source} · ${c.times.timezone_id} · offset ${c.times.local_offset_minutes} мин. Независимая метка времени отсутствует.`);field(dl,'Capture ID',c.capture_id);field(dl,'Метод',c.capture_method);field(dl,'Длительность получения данных (монотонная)',c.duration_ms!=null?c.duration_ms+' мс':null);field(dl,'Предыдущая версия',c.previous_capture_id);if(c.error)field(dl,'Ошибка',c.error);if(c.viewport)field(dl,'Параметры вкладки',JSON.stringify({viewport:c.viewport,pixel_width:c.pixel_width,pixel_height:c.pixel_height,page_zoom:c.page_zoom}));box.append(dl,link(c.source.final_url,'Открыть исходный сайт'));
+  const frames=el('details');frames.append(el('summary',`Исходные кадры (${c.artifacts.filter(a=>a.kind==='screenshot_frame').length})`));if(c.artifacts.some(a=>a.kind==='screenshot_frame'))box.append(frames);
   for(const a of c.artifacts) {
-    const d=el('dl');field(d,'Файл',a.relative_path);field(d,'Размер',a.byte_length+' байт');field(d,'SHA-256',a.sha256,'hash');field(d,'Проверка при записи',a.verification_status);box.append(d);
-    const row=el('div',undefined,'actions');row.append(button('Открыть файл',()=>openArtifact(a)),button('Проверить хеш',async()=>{const result=await verifyArtifact(root,workspace,c.case_id,a);status(result.ok?'SHA-256 подтверждён повторным чтением':'Хеш НЕ совпадает. Файл изменён: '+result.actual,!result.ok);}),button('Копировать SHA-256',()=>navigator.clipboard.writeText(a.sha256)),button('Экспорт оригинала',()=>exportOriginal(a,c.case_id)));box.append(row);
+    const parent=a.kind==='screenshot_frame'?frames:box;
+    const d=el('dl');field(d,'Файл',a.relative_path);field(d,'Размер',a.byte_length+' байт');field(d,'SHA-256',a.sha256,'hash');field(d,'Проверка при записи',a.verification_status);if(a.derivation)field(d,'Производный PDF',JSON.stringify(a.derivation));parent.append(d);
+    const row=el('div',undefined,'actions');row.append(button(a.kind==='derived_pdf'?'Копировать путь PDF':'Открыть файл',async()=>{if(a.kind==='derived_pdf'){await navigator.clipboard.writeText(a.relative_path);status('Путь PDF в рабочей папке скопирован. Откройте файл из этой папки системным просмотрщиком.');}else await openArtifact(a);}),button('Проверить хеш',async()=>{const result=await verifyArtifact(root,workspace,c.case_id,a);status(result.ok?'SHA-256 подтверждён повторным чтением':'Хеш НЕ совпадает. Файл изменён: '+result.actual,!result.ok);}),button('Копировать SHA-256',()=>navigator.clipboard.writeText(a.sha256)),button(a.kind==='derived_pdf'?'Экспорт PDF':'Экспорт оригинала',()=>exportOriginal(a,c.case_id)));if(a.mime_type==='image/png' && a.kind!=='screenshot_frame')row.append(button('Создать PDF',()=>convertPdf(c,a)));parent.append(row);
   }
   box.append(button('Копировать цитирование',async()=>{await navigator.clipboard.writeText(citation(c));status('Цитирование скопировано: URL, UTC, Capture ID и SHA-256');}));
   const pin=button(c.pinned?'Открепить':'Закрепить',async()=>{await exclusive(async()=>{const fresh=await loadState(root,workspace,c.case_id);await append(root,workspace,c.case_id,'capture_pinned','captures',{...fresh.captures[id],pinned:!fresh.captures[id].pinned});});await refresh();showCapture(id);});box.append(pin);
-  if(['failed','interrupted','cancelled','partial'].includes(c.state))box.append(button('Повторить новой фиксацией',async()=>{await refreshSource();if(tab?.url!==c.source.final_url)throw new Error('Откройте исходный URL и нажмите значок TraceVault перед повтором');await runCapture(c.kind==='webpage'?'page':c.kind==='screenshot'?'screen':'image',{id:uuid(),tabId:tab.id,caseId:c.case_id,sourceUrl:c.source.final_url,imageUrl:c.image_source_url});}));
+  if(['failed','interrupted','cancelled','partial'].includes(c.state))box.append(button('Повторить новой фиксацией',async()=>{await refreshSource();if(tab?.url!==c.source.final_url)throw new Error('Откройте исходный URL и нажмите значок TraceVault перед повтором');await runCapture(c.capture_request || (c.kind==='webpage'?'page':c.kind==='screenshot'?'screen':'image'),{id:uuid(),tabId:tab.id,caseId:c.case_id,sourceUrl:c.source.final_url,imageUrl:c.image_source_url});}));
   if(c.warnings.length){box.append(el('h2','Диагностика неполноты'));const pre=el('pre',JSON.stringify(c.warnings,null,2));box.append(pre);}
   const refs=Object.values(state.refs).filter(r=>r.capture_id===id);if(refs.length)box.append(el('p',`Связанные ссылки на фрагменты: ${refs.length}`));
 }
@@ -197,8 +199,14 @@ function showEntity(id) {
   box.append(el('p','Передача: «Экспорт JSON». Прямое подключение OSINTchart в этой версии отсутствует.','muted'));
 }
 function showAudit(event) {details('Событие журнала',event.event_id).append(el('pre',JSON.stringify(event,null,2)));}
+async function convertPdf(record,source){
+  await canWrite();if(busy)throw new Error('Дождитесь текущей операции');const c={...context(),caseId:record.case_id};busy=true;setBusy(true);status('Создание PDF из проверенного PNG…');
+  try{const pdf=await convertScreenshotToPdf(c.root,c.workspace,c.caseId,record.capture_id,source.artifact_id,preferences);status('PDF записан и проверен: '+pdf.relative_path);if(activeCase===c.caseId){await refresh();showCapture(record.capture_id);}}finally{busy=false;setBusy(false);}
+}
 async function openArtifact(artifact) {
-  const file=await readVerifiedFile(root,artifact);if(viewerUrl)URL.revokeObjectURL(viewerUrl);
+  const file=await readVerifiedFile(root,artifact);
+  if(artifact.mime_type==='application/pdf')throw new Error('PDF открывается из рабочей папки системным просмотрщиком');
+ if(viewerUrl)URL.revokeObjectURL(viewerUrl);
   viewerUrl=URL.createObjectURL(new Blob([await file.arrayBuffer()],{type:artifact.mime_type}));$('viewer-content').replaceChildren();
   const node=document.createElement(artifact.mime_type==='text/html'?'iframe':'img');
   if(node.tagName==='IFRAME'){node.setAttribute('sandbox','');node.setAttribute('referrerpolicy','no-referrer');node.title='Изолированный просмотр сохранённого HTML';}else node.alt='Оригинальное изображение';
@@ -246,7 +254,7 @@ action('grant-site',async()=>{
   if(!await chrome.permissions.request({origins:[origin]}))throw new Error('Разрешение не выдано');
   await registerAnnotationSites([origin]);await refreshSource();status('Доступ к домену выдан');
 });
-action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('cancel',()=>controller?.abort());
+action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('capture-full',()=>runCapture('full'));action('capture-pdf',()=>runCapture('pdf'));action('cancel',()=>controller?.abort());
 for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>beginAnnotation(name));action('manual-note',()=>beginAnnotation('manual'));
 action('archive-first',async()=>{if(!pending)return;const p=pending;const source=await chrome.tabs.get(p.tabId);if(source.url!==p.sourceUrl)throw new Error('URL изменился');const result=await runCapture('page',{tabId:p.tabId,caseId:p.caseId,id:uuid()});if(!['completed','partial'].includes(result.state))throw new Error('Архив не подтверждён');p.captureId=result.capture_id;$('reference-state').textContent=`Связь с ${result.evidence_number} · ${result.capture_id}`;});
 $('annotation-form').addEventListener('submit',e=>saveDialog(e).catch(error=>status(errorText(error),true)));
@@ -272,6 +280,8 @@ $('current-page-only').addEventListener('change',()=>{page=0;renderList();});
 const commandActions=[
   {id:'capture-page',label:'Сохранить страницу как HTML'},
   {id:'capture-screen',label:'Скриншот видимой области PNG'},
+  {id:'capture-full',label:'Полный снимок страницы PNG'},
+  {id:'capture-pdf',label:'Страница в PDF — растровая копия полного снимка'},
   {id:'selection-highlight',label:'Подсветить выделенную цитату'},
   {id:'selection-entity',label:'Создать Entity из выделения'},
   {id:'note',label:'Создать свободную заметку',run:()=>beginAnnotation('manual')},

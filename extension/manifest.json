@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TraceVault",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Локальная фиксация веб-материалов с SHA-256, аннотациями и источниками Entity.",
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus", "sidePanel"],

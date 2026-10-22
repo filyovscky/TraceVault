@@ -2,6 +2,8 @@
 
 Runtime: no third-party code. The capture engine is independently implemented. SingleFile is NOT distributed. TraceVault itself has no open-source license grant specified by its owner yet.
 
+0.3.0 full-page stitching and PDF encoding are original JS using browser Canvas/CompressionStream, with no runtime PDF library. The flat T/V mark is original artwork; scripts/icons.py uses the already installed Pillow 12.0.0 (installed metadata: MIT-CMU), only to build PNG icons. Independent local QA used pypdf (BSD-3-Clause) to parse image streams and PyMuPDF (AGPL/commercial) as a separate rendering tool. These Python libraries and their binaries are not included in the extension ZIP or called by the extension. No SingleFile/PyMuPDF source is copied into runtime code. License references: [pypdf](https://pypdf.readthedocs.io/en/5.2.0/meta/faq.html), [PyMuPDF](https://pymupdf.readthedocs.io/en/latest/about.html). This records the distribution boundary and upstream terms, not a legal opinion about a future integration.
+
 Generated from installed locked package metadata; inspect notices in each package when distributing development tooling. Playwright browser binaries are test tools, not included in dist/.
 
 | Package | Version | Declared license | Scope |

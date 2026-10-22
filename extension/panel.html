@@ -2,7 +2,7 @@
 <html lang="ru">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TraceVault</title><link rel="stylesheet" href="panel.css"></head>
 <body>
-  <header><strong>TraceVault</strong><div class="header-actions"><button id="command-menu" title="Команды · Ctrl+Shift+Space">Команды</button><button id="workspace" title="Открыть полную рабочую область">Рабочая область</button><button id="settings-toggle" aria-expanded="false" aria-controls="settings">Настройки</button></div></header>
+  <header><div class="brand"><img class="brand-mark" src="icons/mark.svg" alt="" width="24" height="24"><strong>TraceVault</strong></div><div class="header-actions"><button id="command-menu" title="Команды · Ctrl+Shift+Space">Команды</button><button id="workspace" title="Открыть полную рабочую область">Рабочая область</button><button id="settings-toggle" aria-expanded="false" aria-controls="settings">Настройки</button></div></header>
   <main>
     <section id="setup" aria-labelledby="setup-title">
       <h1 id="setup-title">Рабочая папка</h1><p>Оригиналы, метаданные и журнал сохраняются в выбранной папке. Для переноса скопируйте её целиком.</p>
@@ -18,7 +18,8 @@
       <div id="source-title" class="source-title">Откройте сайт</div><div id="source-url" class="url muted wrap"></div>
       <div id="site-state" class="muted"></div><button id="grant-site">Разрешить доступ к этому сайту</button>
       <p class="muted privacy">В архив попадут видимые данные страницы, включая личные.</p>
-      <div class="actions"><button id="capture-page" class="primary">Сохранить страницу</button><button id="capture-screen">Скриншот</button><button id="cancel" hidden>Отменить</button></div>
+      <div class="actions"><button id="capture-page" class="primary">Сохранить страницу</button><button id="capture-screen">Скриншот</button><button id="capture-full">Полный PNG</button><button id="capture-pdf">Страница в PDF</button><button id="cancel" hidden>Отменить</button></div>
+      <p class="muted privacy">Полный PNG и PDF временно прокручивают страницу. Динамический контент может меняться. PDF — растровая копия без OCR.</p>
       <div class="actions secondary"><button id="selection-highlight">Выделить</button><button id="selection-quote">Цитата</button><button id="selection-note">Заметка</button><button id="selection-entity">Entity</button></div>
       <label class="check"><input id="annotations-toggle" type="checkbox" checked> Показывать аннотации</label>
     </section>

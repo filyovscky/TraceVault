@@ -1,7 +1,7 @@
 import {chromium,expect} from '@playwright/test';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import path from 'node:path';
-export async function launch(profile,{installed=false,headed=false,extensionRoot=path.resolve('extension')}={}) {
+export async function launch(profile,{installed=false,headed=false,nativeViewport=false,extensionRoot=path.resolve('extension')}={}) {
   await mkdir(path.join(profile,'Default'),{recursive:true});
   // Only this isolated QA profile: permit native FSA writes without an unattended
   // browser permission bubble. No permission monkey-patching and no OPFS storage.
@@ -11,7 +11,7 @@ export async function launch(profile,{installed=false,headed=false,extensionRoot
   Object.assign(prefs.profile.default_content_setting_values,{file_system_write_guard:1,file_system_read_guard:1});
   await writeFile(prefPath,JSON.stringify(prefs));
   const options=installed?{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'}:{channel:'chromium'};
-  const context=await chromium.launchPersistentContext(profile,{...options,headless:!headed,ignoreDefaultArgs:installed?['--disable-extensions']:[],args:installed?['--enable-unsafe-extension-debugging']:[`--disable-extensions-except=${extensionRoot}`,`--load-extension=${extensionRoot}`,'--enable-unsafe-extension-debugging']});
+  const context=await chromium.launchPersistentContext(profile,{...options,...(nativeViewport?{viewport:null}:{}),headless:!headed,ignoreDefaultArgs:installed?['--disable-extensions']:[],args:installed?['--enable-unsafe-extension-debugging']:[`--disable-extensions-except=${extensionRoot}`,`--load-extension=${extensionRoot}`,'--enable-unsafe-extension-debugging']});
   if(installed){const cdp=await context.browser().newBrowserCDPSession();const loaded=await cdp.send('Extensions.loadUnpacked',{path:extensionRoot});context.extensionId=loaded.id;await cdp.detach();}
   return context;
 }

@@ -84,7 +84,10 @@
             "enum": [
               "single_html",
               "viewport_png",
-              "original_image"
+              "original_image",
+              "full_page_png",
+              "screenshot_frame",
+              "derived_pdf"
             ]
           },
           "relative_path": {
