@@ -1,3 +1,4 @@
+import {sha256} from './domain.js';
 const menus={quote:'Сохранить выделенный текст',highlight:'Подсветить выделение',entity:'Создать Entity из выделения',note:'Добавить заметку к выделению',image:'Сохранить изображение'};
 chrome.runtime.onInstalled.addListener(async()=>{
   await chrome.contextMenus.removeAll();
@@ -10,7 +11,8 @@ chrome.action.onClicked.addListener(tab=>{chrome.sidePanel.open({tabId:tab.id}).
 async function enqueue(action,tab,extra={}) {
   if(!tab?.id) return;
   const {activeCase}=await chrome.storage.local.get('activeCase');
-  const command={id:crypto.randomUUID(),action,tabId:tab.id,caseId:activeCase || null,sourceUrl:tab.url,created_at:new Date().toISOString(),...extra};
+  const {selectionText,...details}=extra;
+  const command={id:crypto.randomUUID(),action,tabId:tab.id,caseId:activeCase || null,sourceUrl:tab.url,created_at:new Date().toISOString(),selectionDigest:selectionText?await sha256(new TextEncoder().encode(selectionText)):null,...details};
   await chrome.storage.local.set({['command:'+command.id]:command});
 }
 chrome.contextMenus.onClicked.addListener((info,tab)=>{
@@ -29,9 +31,10 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     enqueue(message.action,sender.tab).then(()=>respond({ok:true}),e=>respond({error:e.message}));return true;
   }
   if(message?.type==='TV_ANNOTATIONS' && sender.tab) {
-    chrome.storage.local.get(['annotationCache','annotationsEnabled','activeCase']).then(values=>{
+    chrome.storage.local.get(['annotationCache','annotationsEnabled','activeCase','hiddenAnnotationDomains']).then(values=>{
       const cache=values.annotationCache || {};
-      respond({annotations:(cache[values.activeCase] || []).filter(a=>a.source_url===sender.url && !a.deleted),enabled:values.annotationsEnabled!==false});
+      const siteHidden=(values.hiddenAnnotationDomains || []).includes(new URL(sender.url).hostname);
+      respond({annotations:(cache[values.activeCase] || []).filter(a=>a.source_url===sender.url && !a.deleted),enabled:values.annotationsEnabled!==false && !siteHidden});
     });return true;
   }
 });

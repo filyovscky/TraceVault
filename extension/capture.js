@@ -1,7 +1,8 @@
 // Independent implementation. No SingleFile code is included.
-export function snapshotDocument() {
+export function snapshotDocument(maxBytes=64*1024*1024) {
   const warnings=[];
   function snapshot(doc, depth=0) {
+    if(doc.documentElement.outerHTML.length>maxBytes)throw new Error('DOM превышает лимит размера захвата');
     const clone=doc.documentElement.cloneNode(true), source=[doc.documentElement,...doc.documentElement.querySelectorAll('*')], target=[clone,...clone.querySelectorAll('*')];
     for(let i=0;i<source.length;i++) {
       const a=source[i], b=target[i];
@@ -39,7 +40,8 @@ export function snapshotDocument() {
     });
     return {html:'<!doctype html>\n'+clone.outerHTML,base:doc.baseURI};
   }
-  return {...snapshot(document),warnings,url:location.href,title:document.title,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scroll_x:scrollX,scroll_y:scrollY},user_agent:navigator.userAgent};
+  try {return {...snapshot(document),warnings,url:location.href,title:document.title,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scroll_x:scrollX,scroll_y:scrollY},user_agent:navigator.userAgent};}
+  catch(e){return {error:e.message};}
 }
 
 export async function buildArchive(snapshot, {signal, maxBytes=64*1024*1024, onProgress=()=>{}}={}) {

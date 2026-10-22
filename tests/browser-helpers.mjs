@@ -1,7 +1,7 @@
 import {chromium,expect} from '@playwright/test';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import path from 'node:path';
-export async function launch(profile) {
+export async function launch(profile,{installed=false,headed=false,extensionRoot=path.resolve('extension')}={}) {
   await mkdir(path.join(profile,'Default'),{recursive:true});
   // Only this isolated QA profile: permit native FSA writes without an unattended
   // browser permission bubble. No permission monkey-patching and no OPFS storage.
@@ -10,7 +10,10 @@ export async function launch(profile) {
   prefs.profile ||= {};prefs.profile.default_content_setting_values ||= {};
   Object.assign(prefs.profile.default_content_setting_values,{file_system_write_guard:1,file_system_read_guard:1});
   await writeFile(prefPath,JSON.stringify(prefs));
-  return chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,args:[`--disable-extensions-except=${path.resolve('extension')}`,`--load-extension=${path.resolve('extension')}`,'--enable-unsafe-extension-debugging']});
+  const options=installed?{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'}:{channel:'chromium'};
+  const context=await chromium.launchPersistentContext(profile,{...options,headless:!headed,ignoreDefaultArgs:installed?['--disable-extensions']:[],args:installed?['--enable-unsafe-extension-debugging']:[`--disable-extensions-except=${extensionRoot}`,`--load-extension=${extensionRoot}`,'--enable-unsafe-extension-debugging']});
+  if(installed){const cdp=await context.browser().newBrowserCDPSession();const loaded=await cdp.send('Extensions.loadUnpacked',{path:extensionRoot});context.extensionId=loaded.id;await cdp.detach();}
+  return context;
 }
 export async function invokeExtension(context,page,id) {
   const browserCDP=await context.browser().newBrowserCDPSession();
@@ -20,8 +23,8 @@ export async function invokeExtension(context,page,id) {
   await browserCDP.send('Extensions.triggerAction',{id,targetId:target.targetId});await browserCDP.detach();
 }
 export async function extensionPage(context) {
-  const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  const page=await context.newPage();await page.goto(`chrome-extension://${new URL(worker.url()).host}/panel.html`);return page;
+  const worker=context.extensionId ? null : context.serviceWorkers()[0] || await context.waitForEvent('serviceworker',{timeout:20000});
+  const page=await context.newPage();await page.goto(`chrome-extension://${context.extensionId || new URL(worker.url()).host}/panel.html`);return page;
 }
 // CDP supplies a REAL disk directory via browser drag-and-drop. Only picker selection
 // is automated; storage, handles, permissions, writes and readback are native FSA.

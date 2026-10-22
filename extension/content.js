@@ -11,9 +11,10 @@
     return {nodes,text};
   }
   function selection() {
+    if(document.activeElement?.closest('input,textarea,[contenteditable]'))return null;
     const s=getSelection();
     if(s?.anchorNode?.parentElement?.closest('input,textarea,[contenteditable]')) return null;
-    if(!s?.rangeCount || s.isCollapsed || s.anchorNode?.parentElement?.closest('[data-tracevault-ui]')) return lastSelection;
+    if(!s?.rangeCount || s.isCollapsed || s.anchorNode?.parentElement?.closest('[data-tracevault-ui]')) return lastSelection && locate(model(),lastSelection).status==='attached' ? lastSelection : null;
     const range=s.getRangeAt(0), m=model();
     const a=m.nodes.find(x=>x.node===range.startContainer),b=m.nodes.find(x=>x.node===range.endContainer);
     if(!a || !b) return null;

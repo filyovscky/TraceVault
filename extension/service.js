@@ -5,12 +5,18 @@ import {snapshotDocument, buildArchive} from './capture.js';
 
 export async function inject(tabId) {await chrome.scripting.executeScript({target:{tabId},files:['content.js']});}
 export async function selected(tabId) {await inject(tabId);return chrome.tabs.sendMessage(tabId,{type:'TV_SELECTION'});}
-export async function broadcastAnnotations(caseId,state,enabled) {
+export async function registerAnnotationSites(origins) {
+  for(const origin of origins)if(!await chrome.permissions.contains({origins:[origin]}))throw new Error('Нет разрешения на восстановление аннотаций: '+origin);
+  const registered=await chrome.scripting.getRegisteredContentScripts(),matches=[...new Set(registered.flatMap(s=>s.matches).concat(origins))];
+  if(registered.length)await chrome.scripting.unregisterContentScripts({ids:registered.map(s=>s.id)});
+  await chrome.scripting.registerContentScripts([{id:'tracevault-annotations',matches,js:['content.js'],runAt:'document_idle',persistAcrossSessions:true}]);
+}
+export async function broadcastAnnotations(caseId,state,enabled,hiddenDomains=[]) {
   const values=await chrome.storage.local.get('annotationCache'),cache=values.annotationCache || {};
   cache[caseId]=Object.values(state.annotations).filter(a=>!a.deleted);
-  await chrome.storage.local.set({annotationCache:cache,activeCase:caseId,annotationsEnabled:enabled});
+  await chrome.storage.local.set({annotationCache:cache,activeCase:caseId,annotationsEnabled:enabled,hiddenAnnotationDomains:hiddenDomains});
   const tabs=await chrome.tabs.query({});
-  await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:cache[caseId].filter(a=>a.source_url===tab.url),enabled})));
+  await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:cache[caseId].filter(a=>a.source_url===tab.url),enabled:enabled && !hiddenDomains.some(host=>{try{return new URL(tab.url).hostname===host;}catch{return false;}})})));
 }
 export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page',imageUrl=null,settings={},signal,onProgress=()=>{}}) {
   return exclusive(async()=>{
@@ -28,7 +34,8 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
       await new Promise(resolve=>setTimeout(resolve,100));
       let payload,mime,ext,folder,metadata={};
       if(kind==='page') {
-        const [{result:snapshot}]=await chrome.scripting.executeScript({target:{tabId},func:snapshotDocument});
+        const [{result:snapshot}]=await chrome.scripting.executeScript({target:{tabId},func:snapshotDocument,args:[settings.maxBytes || 64*1024*1024]});
+        if(!snapshot || snapshot.error)throw new Error(snapshot?.error || 'Chrome не вернул DOM. Возможно, вкладка закрыта или документ выгружен.');
         if(snapshot.url!==tab.url) throw new Error('URL изменился во время получения DOM. Повторите фиксацию.');
         const archive=await buildArchive(snapshot,{signal,maxBytes:settings.maxBytes,onProgress});
         payload=archive.html;mime='text/html';ext='html';folder='captures';metadata={viewport:snapshot.viewport,user_agent:snapshot.user_agent,capture_method:'tracevault-dom-inline-v1'};
@@ -55,6 +62,11 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
       signal?.throwIfAborted();
       const final=await chrome.tabs.get(tabId);if(final.url!==tab.url) throw new Error('Страница перешла на другой URL до завершения захвата');
       record.times.capture_finished_at=now();record.duration_ms=Math.round(performance.now()-monotonic);Object.assign(record,metadata);
+      const wallElapsed=Date.parse(record.times.capture_finished_at)-Date.parse(start);
+      if(wallElapsed<0 || Math.abs(wallElapsed-record.duration_ms)>2000) {
+        record.warnings.push({type:'clock_anomaly',reason:'Системные часы изменились в ходе операции',wall_elapsed_ms:wallElapsed,monotonic_elapsed_ms:record.duration_ms});
+        await append(root,workspace,caseId,'clock_anomaly',null,null,{capture_id:id,wall_elapsed_ms:wallElapsed,monotonic_elapsed_ms:record.duration_ms});
+      }
       await save('capture_writing',{state:'writing'});
       const path=casePath(workspace,caseId)+`${folder}/${id}.${ext}`;
       const artifact=await writeNew(root,path,payload,mime);artifact.capture_id=id;artifact.kind=kind==='page'?'single_html':kind==='image'?'original_image':'viewport_png';
@@ -83,7 +95,7 @@ export async function saveAnnotation({root,workspace,caseId,tabId,selection,note
       doc.querySelectorAll('script,style,noscript,textarea,input,[contenteditable="true"],[data-tracevault-ui]').forEach(n=>n.remove());
       if(locateQuote(doc.body.textContent,selection).status!=='attached')throw new Error('Цитата не найдена однозначно в сохранённом архиве. Сохраните её как live_only или повторите фиксацию.');
     }
-    const ref={schema_version:1,reference_id:uuid(),case_id:caseId,source_url:tab?.url || archived?.source.final_url || null,capture_id:artifact ? archived.capture_id : null,artifact_id:artifact?.artifact_id || null,quote:selection?.exact || '',selection:selection || null,status:artifact?'archived':'live_only',observed_at:now(),attribution:'mentions',verification:'unconfirmed'};
+    const ref={schema_version:1,reference_id:uuid(),case_id:caseId,source_url:tab?.url || archived?.source.final_url || null,capture_id:artifact ? archived.capture_id : null,artifact_id:artifact?.artifact_id || null,quote:selection?.exact || '',selection:selection || null,status:artifact?'archived':'live_only',observed_at:now(),time_context:clock(),attribution:'mentions',verification:'unconfirmed'};
     const timestamp=now(),annotation={schema_version:1,annotation_id:uuid(),case_id:caseId,source_url:ref.source_url,capture_id:ref.capture_id,reference_id:ref.reference_id,type,selection:selection || null,appearance:{color_token:color},note,tags:[],author,created_at:timestamp,updated_at:timestamp,reattachment_status:selection?'pending':'not_applicable',hidden:false,deleted:false};
     await append(root,workspace,caseId,'evidence_reference_created','refs',ref);
     await append(root,workspace,caseId,'annotation_created','annotations',annotation);

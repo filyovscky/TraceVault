@@ -29,5 +29,11 @@ test('UI actions save real files; ambiguous/orphaned anchors; safe preview; sour
     // Original HTML cannot be mutated by annotation editing.
     const before=await readFile(path.join(directory,cap.artifacts[0].relative_path),'utf8');
     await panel.locator('#list .item-button').filter({hasText:'Свободная заметка без страницы'}).click();await panel.getByRole('button',{name:'Изменить',exact:true}).click();await panel.locator('#annotation-note').fill('Изменённая заметка');await panel.locator('#annotation-form button[type=submit]').click();expect(await readFile(path.join(directory,cap.artifacts[0].relative_path),'utf8')).toBe(before);
+    await expect(panel.locator('#annotation-dialog')).not.toBeVisible();
+    await source.evaluate(()=>{document.querySelector('p').textContent='Генеральный директор Иван Иванов назначен на должность.';const n=document.querySelector('p').firstChild,s=n.textContent.indexOf('Иван Иванов'),r=new Range();r.setStart(n,s);r.setEnd(n,s+'Иван Иванов'.length);getSelection().removeAllRanges();getSelection().addRange(r);});
+    await panel.evaluate(async()=>{const s=await import('./service.js'),[tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});await s.selected(tab.id);});
+    await source.locator('input[type=password]').fill('QA-SECRET-NOT-FOR-STORAGE');
+    await panel.locator('#selection-entity').click();await expect(panel.locator('#status')).toContainText('Выделите текст');await expect(panel.locator('#annotation-dialog')).not.toBeVisible();
+    expect(await panel.evaluate(async()=>JSON.stringify(await chrome.storage.local.get(null)))).not.toContain('QA-SECRET-NOT-FOR-STORAGE');
   }finally{await context.close();fixture.server.close();}
 });

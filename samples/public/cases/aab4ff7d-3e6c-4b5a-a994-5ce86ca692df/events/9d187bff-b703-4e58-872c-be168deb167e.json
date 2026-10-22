@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "event_id": "9d187bff-b703-4e58-872c-be168deb167e",
+  "sequence": 6,
+  "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+  "recorded_at": "2026-10-22T00:25:56.396Z",
+  "time_context": {
+    "timezone_id": "Europe/Moscow",
+    "local_offset_minutes": 180,
+    "clock_source": "system_clock"
+  },
+  "action": "capture_started",
+  "record_type": "captures",
+  "value": {
+    "schema_version": 1,
+    "capture_id": "c2839bb9-d5a9-4388-a90d-5d0dfa6ce309",
+    "evidence_number": "EVD-000002",
+    "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+    "kind": "webpage",
+    "source": {
+      "original_url": "https://example.org/",
+      "final_url": "https://example.org/",
+      "title": "Example Domain",
+      "origin": "https://example.org"
+    },
+    "times": {
+      "capture_started_at": "2026-10-22T00:25:56.383Z",
+      "first_seen_at": "2026-10-22T00:25:56.383Z",
+      "timezone_id": "Europe/Moscow",
+      "local_offset_minutes": 180,
+      "clock_source": "system_clock"
+    },
+    "state": "capturing",
+    "capture_status": "pending",
+    "collector_version": "0.1.0",
+    "artifacts": [],
+    "warnings": [],
+    "previous_capture_id": null
+  },
+  "details": {}
+}

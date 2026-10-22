@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "event_id": "8a0dbdb7-a52a-42f2-ad00-49846562e31d",
+  "sequence": 12,
+  "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+  "recorded_at": "2026-10-22T00:26:00.210Z",
+  "time_context": {
+    "timezone_id": "Europe/Moscow",
+    "local_offset_minutes": 180,
+    "clock_source": "system_clock"
+  },
+  "action": "artifact_written",
+  "record_type": "captures",
+  "value": {
+    "schema_version": 1,
+    "capture_id": "5570012b-3954-47a4-b158-64f1a4f08593",
+    "evidence_number": "EVD-000003",
+    "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+    "kind": "webpage",
+    "source": {
+      "original_url": "https://example.net/",
+      "final_url": "https://example.net/",
+      "title": "Example Domain",
+      "origin": "https://example.net"
+    },
+    "times": {
+      "capture_started_at": "2026-10-22T00:25:59.284Z",
+      "first_seen_at": "2026-10-22T00:25:59.284Z",
+      "timezone_id": "Europe/Moscow",
+      "local_offset_minutes": 180,
+      "clock_source": "system_clock",
+      "capture_finished_at": "2026-10-22T00:25:59.615Z",
+      "artifact_write_started_at": "2026-10-22T00:25:59.807Z",
+      "artifact_written_at": "2026-10-22T00:26:00.189Z",
+      "record_created_at": "2026-10-22T00:26:00.192Z"
+    },
+    "state": "verifying",
+    "capture_status": "pending",
+    "collector_version": "0.1.0",
+    "artifacts": [
+      {
+        "artifact_id": "ada81b36-6e72-4b23-9406-36125c2c3d61",
+        "relative_path": "cases/aab4ff7d-3e6c-4b5a-a994-5ce86ca692df/captures/5570012b-3954-47a4-b158-64f1a4f08593.html",
+        "mime_type": "text/html",
+        "byte_length": 2662,
+        "sha256": "56f0a5a17dfb7c10f71ed9e04aad46856e05580c6fdff2e228f0a0ee8ba96fac",
+        "created_at": "2026-10-22T00:25:59.807Z",
+        "artifact_write_started_at": "2026-10-22T00:25:59.807Z",
+        "written_at": "2026-10-22T00:26:00.189Z",
+        "verification_status": "verified_readback",
+        "time_context": {
+          "timezone_id": "Europe/Moscow",
+          "local_offset_minutes": 180,
+          "clock_source": "system_clock"
+        },
+        "capture_id": "5570012b-3954-47a4-b158-64f1a4f08593",
+        "kind": "single_html"
+      }
+    ],
+    "warnings": [],
+    "previous_capture_id": null,
+    "duration_ms": 331,
+    "viewport": {
+      "dpr": 1,
+      "height": 720,
+      "scroll_x": 0,
+      "scroll_y": 0,
+      "width": 1280
+    },
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+    "capture_method": "tracevault-dom-inline-v1"
+  },
+  "details": {}
+}

@@ -1,4 +1,4 @@
-import {safePath, sha256, now, uuid} from './domain.js';
+import {safePath, sha256, now, uuid,clock} from './domain.js';
 let dbPromise;
 function db() {
   return dbPromise ||= new Promise((resolve,reject)=>{
@@ -39,7 +39,7 @@ export async function writeNew(root,path,data,mime='application/json') {
   try { await writable.write(bytes); await writable.close(); } catch(e) { try { await writable.abort(); } catch { /* already closed */ } throw e; }
   const written = now(), stored = await handle.getFile(), after = await sha256(await stored.arrayBuffer());
   if (before !== after || stored.size !== bytes.byteLength) throw new Error('Проверка записанного файла не пройдена: '+path);
-  return {artifact_id:uuid(), relative_path:path, mime_type:mime, byte_length:stored.size, sha256:after, created_at:started, artifact_write_started_at:started, written_at:written, verification_status:'verified_readback'};
+  return {artifact_id:uuid(), relative_path:path, mime_type:mime, byte_length:stored.size, sha256:after, created_at:started, artifact_write_started_at:started, written_at:written, verification_status:'verified_readback',time_context:clock()};
 }
 export async function probe(root) {
   const path = '.tracevault-probe-'+uuid()+'.txt', content = 'TraceVault access check '+uuid();

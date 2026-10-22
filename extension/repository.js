@@ -1,5 +1,5 @@
 import {directory, readJSON, exists, writeNew} from './storage.js';
-import {now, uuid, foldEvents, SCHEMA} from './domain.js';
+import {now, uuid, foldEvents, SCHEMA,clock} from './domain.js';
 export function casePath(workspace, id) { return workspace.mode === 'single_case' ? '' : `cases/${id}/`; }
 export async function listCases(root, workspace) {
   if (workspace.mode === 'single_case') return await exists(root,'case.json') ? [await readJSON(root,'case.json')] : [];
@@ -22,22 +22,36 @@ export async function createCase(root, workspace, title, code) {
   await append(root,workspace,c.case_id,'case_created',null,c);
   return c;
 }
+// Rebuildable in-memory index. Every replay still enumerates real disk files and
+// checks size/mtime; cache is discarded on restart and never becomes primary data.
+const eventCache=new Map();
 export async function loadState(root,workspace,id) {
+  const caseInfo=await readJSON(root,casePath(workspace,id)+'case.json');
+  if(caseInfo.schema_version!==1 || caseInfo.case_id!==id)throw new Error('Дело отсутствует в выбранной рабочей папке или его схема несовместима');
   const events = [];
   try {
     const dir = await directory(root,(casePath(workspace,id)+'events').split('/'));
-    for await (const [name, handle] of dir.entries()) if (name.endsWith('.json') && handle.kind === 'file') {
-      try { events.push(JSON.parse(await (await handle.getFile()).text())); }
-      catch { throw new Error('Повреждён журнал '+name+'. Сохраните резервную копию и восстановите файл. Изменения заблокированы.'); }
+    const handles=[];
+    for await (const [name, handle] of dir.entries()) if (name.endsWith('.json') && handle.kind === 'file')handles.push({name,handle});
+    for(let offset=0;offset<handles.length;offset+=32) {
+      const batch=await Promise.all(handles.slice(offset,offset+32).map(async({name,handle})=>{
+        const file=await handle.getFile(),key=workspace.workspace_id+'/'+id+'/'+name,cached=eventCache.get(key);
+        if(cached && cached.size===file.size && cached.modified===file.lastModified)return cached.event;
+        let event;
+        try {event=JSON.parse(await file.text());}
+        catch { throw new Error('Повреждён журнал '+name+'. Сохраните резервную копию и восстановите файл. Изменения заблокированы.'); }
+        eventCache.set(key,{size:file.size,modified:file.lastModified,event});return event;
+      }));events.push(...batch);
     }
   } catch(e) { if (e.name !== 'NotFoundError') throw e; }
   const sequences = events.map(e=>e.sequence);
   if (sequences.some(s=>!Number.isSafeInteger(s)) || new Set(sequences).size !== sequences.length) throw new Error('Некорректные последовательности журнала');
-  return foldEvents(events);
+  if(sequences.sort((a,b)=>a-b).some((s,i)=>s!==i+1))throw new Error('Нарушена последовательность журнала: возможно, удалено событие. Изменения заблокированы.');
+  return structuredClone(foldEvents(events));
 }
 export async function append(root,workspace,id,action,recordType,value,details={}) {
   const state = await loadState(root,workspace,id);
-  const e = {schema_version:SCHEMA,event_id:uuid(),sequence:state.audit.length ? state.audit.at(-1).sequence+1 : 1,case_id:id,recorded_at:now(),action,record_type:recordType,value,details};
+  const e = {schema_version:SCHEMA,event_id:uuid(),sequence:state.audit.length ? state.audit.at(-1).sequence+1 : 1,case_id:id,recorded_at:now(),time_context:clock(),action,record_type:recordType,value,details};
   await writeNew(root,casePath(workspace,id)+`events/${e.event_id}.json`,e);
   return e;
 }

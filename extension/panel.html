@@ -17,25 +17,26 @@
       <div class="row source-head"><h2>Текущая страница</h2><button id="refresh-source">Обновить</button></div>
       <div id="source-title" class="source-title">Откройте сайт</div><div id="source-url" class="url muted wrap"></div>
       <div id="site-state" class="muted"></div><button id="grant-site">Разрешить доступ к этому сайту</button>
-      <p class="muted privacy">Архив может содержать личные данные видимой страницы. Ввод паролей не сохраняется. Часы компьютера не подтверждают время независимо.</p>
+      <p class="muted privacy">В архив попадут видимые данные страницы, включая личные.</p>
       <div class="actions"><button id="capture-page" class="primary">Сохранить страницу</button><button id="capture-screen">Скриншот</button><button id="cancel" hidden>Отменить</button></div>
-      <div class="actions secondary"><button id="selection-highlight">Выделить</button><button id="selection-quote">Цитата</button><button id="selection-note">Заметка</button><button id="selection-entity">Entity</button><button id="manual-note">Свободная заметка</button></div>
-      <label class="check"><input id="annotations-toggle" type="checkbox" checked> Показывать аннотации и панель выделения</label>
+      <div class="actions secondary"><button id="selection-highlight">Выделить</button><button id="selection-quote">Цитата</button><button id="selection-note">Заметка</button><button id="selection-entity">Entity</button></div>
+      <label class="check"><input id="annotations-toggle" type="checkbox" checked> Показывать аннотации</label>
     </section>
     <section id="settings" hidden aria-labelledby="settings-title">
       <h2 id="settings-title">Настройки</h2>
       <label>Тема<select id="theme"><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
       <label class="check"><input id="paused" type="checkbox"> Приостановить всю фиксацию</label>
+      <button id="site-annotations" hidden>Скрыть аннотации на этом сайте</button>
       <label>Исключённые домены (по одному в строке)<textarea id="blocked-domains" rows="3" placeholder="bank.example"></textarea></label>
       <label>Предел захвата, МБ<input id="max-size" type="number" min="1" max="256" value="64"></label>
       <button id="save-settings">Сохранить настройки</button><button id="shortcuts">Горячие клавиши Chrome</button>
-      <p class="muted">Данные: выбранная папка. В браузере: доступ к папке, настройки, кеш аннотаций, очередь явных команд. Серверов и телеметрии нет. Для восстановления после очистки браузера снова выберите папку.</p>
+      <p class="muted">Данные: выбранная папка. В браузере: доступ к папке, настройки, кеш аннотаций, очередь явных команд. Серверов и телеметрии нет. Для восстановления после очистки браузера снова выберите папку. Вводимые поля при архивировании очищаются. Системные часы не являются независимым подтверждением времени.</p>
     </section>
     <section id="collection" aria-labelledby="collection-title">
-      <div class="row"><h2 id="collection-title">Дело</h2><button id="export-case">Экспорт JSON</button></div>
+      <div class="row"><h2 id="collection-title">Дело</h2><button id="manual-note" hidden>Свободная заметка</button><button id="export-case">Экспорт JSON</button></div>
       <nav aria-label="Разделы дела"><button data-view="captures" aria-current="page">Материалы</button><button data-view="annotations">Аннотации</button><button data-view="entities">Сущности</button><button data-view="audit">История</button></nav>
       <label class="search-label">Поиск<input id="search" type="search" placeholder="Название, URL, цитата, метка, номер…"></label>
-      <div class="filters"><label>Тип<select id="type-filter"><option value="">Все</option><option value="webpage">HTML</option><option value="screenshot">PNG</option><option value="image">Изображение</option></select></label><label>Статус<select id="status-filter"><option value="">Все</option><option value="completed">Сохранено</option><option value="partial">Частично</option><option value="failed">Ошибка</option><option value="interrupted">Прервано</option></select></label><label>Домен<input id="domain-filter" placeholder="example.org"></label><label>С даты<input id="date-filter" type="date"></label></div>
+      <details id="filter-options"><summary>Фильтры</summary><div class="filters"><label>Тип<select id="type-filter"><option value="">Все</option><option value="webpage">HTML</option><option value="screenshot">PNG</option><option value="image">Изображение</option></select></label><label>Статус<select id="status-filter"><option value="">Все</option><option value="completed">Сохранено</option><option value="partial">Частично</option><option value="failed">Ошибка</option><option value="interrupted">Прервано</option></select></label><label>Домен<input id="domain-filter" placeholder="example.org"></label><label>С даты<input id="date-filter" type="date"></label></div></details>
       <div id="list" role="list"></div><div class="row pagination"><button id="previous">Предыдущие</button><span id="page-number" class="muted"></span><button id="next">Следующие</button></div>
     </section>
     <section id="details" hidden aria-labelledby="details-title"><div class="row"><h2 id="details-title">Карточка</h2><button id="close-details">Закрыть карточку</button></div><div id="details-body"></div></section>

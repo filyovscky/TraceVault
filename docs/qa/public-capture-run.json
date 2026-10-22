@@ -1,0 +1,182 @@
+{
+  "directory": "samples/public",
+  "records": [
+    {
+      "schema_version": 1,
+      "capture_id": "7e28eebd-f6d8-4fc9-b6e9-e7d8852fcc09",
+      "evidence_number": "EVD-000001",
+      "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+      "kind": "webpage",
+      "source": {
+        "original_url": "https://example.com/",
+        "final_url": "https://example.com/",
+        "title": "Example Domain",
+        "origin": "https://example.com"
+      },
+      "times": {
+        "capture_started_at": "2026-10-22T00:25:54.059Z",
+        "first_seen_at": "2026-10-22T00:25:54.059Z",
+        "timezone_id": "Europe/Moscow",
+        "local_offset_minutes": 180,
+        "clock_source": "system_clock",
+        "capture_finished_at": "2026-10-22T00:25:54.436Z",
+        "artifact_write_started_at": "2026-10-22T00:25:54.611Z",
+        "artifact_written_at": "2026-10-22T00:25:55.398Z",
+        "record_created_at": "2026-10-22T00:25:55.401Z"
+      },
+      "state": "completed",
+      "capture_status": "complete",
+      "collector_version": "0.1.0",
+      "artifacts": [
+        {
+          "artifact_id": "00360462-d846-4bdc-8290-cf77ebbdedf0",
+          "relative_path": "cases/aab4ff7d-3e6c-4b5a-a994-5ce86ca692df/captures/7e28eebd-f6d8-4fc9-b6e9-e7d8852fcc09.html",
+          "mime_type": "text/html",
+          "byte_length": 2662,
+          "sha256": "56f0a5a17dfb7c10f71ed9e04aad46856e05580c6fdff2e228f0a0ee8ba96fac",
+          "created_at": "2026-10-22T00:25:54.611Z",
+          "artifact_write_started_at": "2026-10-22T00:25:54.611Z",
+          "written_at": "2026-10-22T00:25:55.398Z",
+          "verification_status": "verified_readback",
+          "time_context": {
+            "timezone_id": "Europe/Moscow",
+            "local_offset_minutes": 180,
+            "clock_source": "system_clock"
+          },
+          "capture_id": "7e28eebd-f6d8-4fc9-b6e9-e7d8852fcc09",
+          "kind": "single_html"
+        }
+      ],
+      "warnings": [],
+      "previous_capture_id": null,
+      "duration_ms": 376,
+      "viewport": {
+        "dpr": 1,
+        "height": 720,
+        "scroll_x": 0,
+        "scroll_y": 0,
+        "width": 1280
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "capture_method": "tracevault-dom-inline-v1"
+    },
+    {
+      "schema_version": 1,
+      "capture_id": "c2839bb9-d5a9-4388-a90d-5d0dfa6ce309",
+      "evidence_number": "EVD-000002",
+      "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+      "kind": "webpage",
+      "source": {
+        "original_url": "https://example.org/",
+        "final_url": "https://example.org/",
+        "title": "Example Domain",
+        "origin": "https://example.org"
+      },
+      "times": {
+        "capture_started_at": "2026-10-22T00:25:56.383Z",
+        "first_seen_at": "2026-10-22T00:25:56.383Z",
+        "timezone_id": "Europe/Moscow",
+        "local_offset_minutes": 180,
+        "clock_source": "system_clock",
+        "capture_finished_at": "2026-10-22T00:25:57.024Z",
+        "artifact_write_started_at": "2026-10-22T00:25:57.668Z",
+        "artifact_written_at": "2026-10-22T00:25:58.241Z",
+        "record_created_at": "2026-10-22T00:25:58.243Z"
+      },
+      "state": "completed",
+      "capture_status": "complete",
+      "collector_version": "0.1.0",
+      "artifacts": [
+        {
+          "artifact_id": "7e7933d9-0052-4bb6-8390-cae4fd1d9eaf",
+          "relative_path": "cases/aab4ff7d-3e6c-4b5a-a994-5ce86ca692df/captures/c2839bb9-d5a9-4388-a90d-5d0dfa6ce309.html",
+          "mime_type": "text/html",
+          "byte_length": 2662,
+          "sha256": "56f0a5a17dfb7c10f71ed9e04aad46856e05580c6fdff2e228f0a0ee8ba96fac",
+          "created_at": "2026-10-22T00:25:57.668Z",
+          "artifact_write_started_at": "2026-10-22T00:25:57.668Z",
+          "written_at": "2026-10-22T00:25:58.241Z",
+          "verification_status": "verified_readback",
+          "time_context": {
+            "timezone_id": "Europe/Moscow",
+            "local_offset_minutes": 180,
+            "clock_source": "system_clock"
+          },
+          "capture_id": "c2839bb9-d5a9-4388-a90d-5d0dfa6ce309",
+          "kind": "single_html"
+        }
+      ],
+      "warnings": [],
+      "previous_capture_id": null,
+      "duration_ms": 641,
+      "viewport": {
+        "dpr": 1,
+        "height": 720,
+        "scroll_x": 0,
+        "scroll_y": 0,
+        "width": 1280
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "capture_method": "tracevault-dom-inline-v1"
+    },
+    {
+      "schema_version": 1,
+      "capture_id": "5570012b-3954-47a4-b158-64f1a4f08593",
+      "evidence_number": "EVD-000003",
+      "case_id": "aab4ff7d-3e6c-4b5a-a994-5ce86ca692df",
+      "kind": "webpage",
+      "source": {
+        "original_url": "https://example.net/",
+        "final_url": "https://example.net/",
+        "title": "Example Domain",
+        "origin": "https://example.net"
+      },
+      "times": {
+        "capture_started_at": "2026-10-22T00:25:59.284Z",
+        "first_seen_at": "2026-10-22T00:25:59.284Z",
+        "timezone_id": "Europe/Moscow",
+        "local_offset_minutes": 180,
+        "clock_source": "system_clock",
+        "capture_finished_at": "2026-10-22T00:25:59.615Z",
+        "artifact_write_started_at": "2026-10-22T00:25:59.807Z",
+        "artifact_written_at": "2026-10-22T00:26:00.189Z",
+        "record_created_at": "2026-10-22T00:26:00.192Z"
+      },
+      "state": "completed",
+      "capture_status": "complete",
+      "collector_version": "0.1.0",
+      "artifacts": [
+        {
+          "artifact_id": "ada81b36-6e72-4b23-9406-36125c2c3d61",
+          "relative_path": "cases/aab4ff7d-3e6c-4b5a-a994-5ce86ca692df/captures/5570012b-3954-47a4-b158-64f1a4f08593.html",
+          "mime_type": "text/html",
+          "byte_length": 2662,
+          "sha256": "56f0a5a17dfb7c10f71ed9e04aad46856e05580c6fdff2e228f0a0ee8ba96fac",
+          "created_at": "2026-10-22T00:25:59.807Z",
+          "artifact_write_started_at": "2026-10-22T00:25:59.807Z",
+          "written_at": "2026-10-22T00:26:00.189Z",
+          "verification_status": "verified_readback",
+          "time_context": {
+            "timezone_id": "Europe/Moscow",
+            "local_offset_minutes": 180,
+            "clock_source": "system_clock"
+          },
+          "capture_id": "5570012b-3954-47a4-b158-64f1a4f08593",
+          "kind": "single_html"
+        }
+      ],
+      "warnings": [],
+      "previous_capture_id": null,
+      "duration_ms": 331,
+      "viewport": {
+        "dpr": 1,
+        "height": 720,
+        "scroll_x": 0,
+        "scroll_y": 0,
+        "width": 1280
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "capture_method": "tracevault-dom-inline-v1"
+    }
+  ]
+}
