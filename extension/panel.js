@@ -10,6 +10,16 @@ let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotat
 let preferences={theme:'system',paused:false,hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
 const statuses={};
 const sessionId=uuid();
+const filterIds=['search','type-filter','status-filter','annotation-type-filter','domain-filter','date-filter','current-page-only'];
+const viewFilters={};
+function resetFilters(){for(const id of filterIds){const input=$(id);if(input.type==='checkbox')input.checked=false;else input.value='';}page=0;renderList();}
+function switchView(next){
+  if(next===view)return;
+  viewFilters[view]=Object.fromEntries(filterIds.map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]));
+  view=next;page=0;selectedId=null;$('details').hidden=true;
+  for(const id of filterIds){const input=$(id),value=viewFilters[view]?.[id];if(input.type==='checkbox')input.checked=value ?? false;else input.value=value ?? '';}
+  document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});renderList();
+}
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 function status(message,error=false) {$('status').textContent=message;$('status').parentElement.dataset.error=String(error);const alert=document.querySelector('dialog[open] .dialog-error');if(alert){alert.hidden=!error;alert.textContent=error?message:'';}}
 async function reportError(e){console.error('TraceVault:',e);status(errorText(e),true);if(root)try{await renderFolder();}catch{/* Keep the original error; source navigation stays independent. */}}
@@ -156,14 +166,22 @@ async function saveDialog(event) {
   }finally{dialogSaving=false;submit.disabled=false;}
 }
 function renderList() {
-  $('collection-title').textContent={captures:'Materials',annotations:'Annotations',entities:'Entities',audit:'History'}[view];
+  $('collection-title').textContent={captures:'Materials',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
   $('manual-note').hidden=view!=='annotations';
-  const query=$('search').value.toLocaleLowerCase('en'),type=$('type-filter').value,filter=$('status-filter').value,domain=$('domain-filter').value.trim().toLowerCase(),date=$('date-filter').value;
+  $('capture-type-label').hidden=view!=='captures';$('capture-status-label').hidden=view!=='captures';$('annotation-type-label').hidden=view!=='annotations';
+  const query=$('search').value.trim().toLocaleLowerCase('en'),type=$('type-filter').value,filter=$('status-filter').value,domain=$('domain-filter').value.trim().toLowerCase(),date=$('date-filter').value;
   let rows=Object.values(state[view] || {});
   if(view==='annotations')rows=rows.filter(a=>!a.deleted);
+  const total=rows.length;
+  const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
+  $('filter-count').textContent=activeFilters?` · ${activeFilters} active`:'';
+  $('reset-filters').disabled=!activeFilters;
+  const annotationCounts=[['text_highlight','highlight'],['quote','quote'],['note','note']].map(([type,label])=>{const count=rows.filter(r=>r.type===type).length;return `${count} ${label}${count===1?'':'s'}`;}).join(' · ');
+  $('collection-description').textContent={captures:`${total} saved record${total===1?'':'s'} in this case`,annotations:annotationCounts,entities:`${total} entit${total===1?'y':'ies'} in this case`,audit:`${total} history event${total===1?'':'s'} in this case`}[view];
   rows=rows.filter(r=>{
     if(query && !JSON.stringify(r).toLocaleLowerCase('en').includes(query))return false;
     if(view==='captures' && ((type && r.kind!==type) || (filter && r.state!==filter)))return false;
+    if(view==='annotations' && $('annotation-type-filter').value && r.type!==$('annotation-type-filter').value)return false;
     const urls=recordUrls(r,state.refs);
     if(domain && !urls.some(url=>matchesDomain(url,domain)))return false;
     if($('current-page-only').checked && !urls.includes(tab?.url))return false;
@@ -176,12 +194,20 @@ function renderList() {
     const b=button('',()=>view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
     let title,meta;
     if(view==='captures'){title=`${row.pinned?"Pinned · ":''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?"Full PNG":row.kind==='screenshot'?'PNG':"Image"} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
-    else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
+    else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${{text_highlight:'Highlight',quote:'Quote',note:'Note'}[row.type] || 'Annotation'} · ${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · unconfirmed · ${row.evidence_refs.length} sources · ${localTime(row.created_at)}`;}
     else {title=row.action;meta=localTime(row.recorded_at);}
     b.append(el('span',title,'item-title'),el('span',meta,'item-meta'));item.append(b);$('list').append(item);
   }
-  if(!rows.length)$('list').append(el('p',activeCase?"No records match these filters.":"Choose a folder and create a case.",'empty'));
+  if(!rows.length){
+    const empty=el('div',undefined,'empty');
+    const filtered=activeCase && total>0 && activeFilters>0;
+    empty.append(el('strong',!activeCase?'Choose a workspace to start':filtered?'No matching records':{captures:'No materials yet',annotations:'No highlights or notes yet',entities:'No entities yet',audit:'No history yet'}[view]));
+    empty.append(el('p',!activeCase?'Choose a folder above, then create or open a case.':filtered?'Your records are still in this case. Clear the filters to see them.':{captures:'Use Capture above to save this page as HTML, PNG or PDF.',annotations:'Select text on a website, right-click and choose TraceVault → Highlight selection. A note is optional.',entities:'Select text on a website and use Create entity from selection.',audit:'Saved actions will appear here.'}[view]));
+    if(filtered)empty.append(button('Clear filters',resetFilters,true));
+    $('list').append(empty);
+  }
+  $('collection').querySelector('.pagination').hidden=!rows.length;
   $('page-number').textContent=`${page+1} / ${maxPage+1} · ${rows.length}`;$('previous').disabled=page===0;$('next').disabled=page===maxPage;
 }
 function details(title,id) {$('details').hidden=false;$('details-title').textContent=title;$('details-body').replaceChildren();selectedId=id;renderList();return $('details-body');}
@@ -296,8 +322,8 @@ $('annotation-form').addEventListener('submit',e=>saveDialog(e).catch(reportErro
 $('entity-type').replaceChildren(...ENTITY_TYPES.map(type=>Object.assign(el('option',t(type)),{value:type})));$('entity-type').addEventListener('change',updateDuplicates);$('entity-label').addEventListener('input',updateDuplicates);
 document.querySelectorAll('[data-close-dialog]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
 $('annotation-dialog').addEventListener('close',()=>processInbox().catch(e=>status(errorText(e),true)));
-document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;page=0;document.querySelectorAll('[data-view]').forEach(n=>n.removeAttribute('aria-current'));b.setAttribute('aria-current','page');renderList();}));
-for(const id of ['search','type-filter','status-filter','domain-filter','date-filter'])$(id).addEventListener('input',()=>{page=0;renderList();});
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+for(const id of filterIds.filter(id=>id!=='current-page-only'))$(id).addEventListener('input',()=>{page=0;renderList();});
 action('previous',()=>{page--;renderList();});action('next',()=>{page++;renderList();});action('close-details',()=>{$('details').hidden=true;selectedId=null;renderList();});
 action('close-viewer',()=>{$('viewer').close();});
 $('viewer').addEventListener('close',()=>{$('viewer-content').replaceChildren();if(viewerUrl)URL.revokeObjectURL(viewerUrl);viewerUrl=null;});
@@ -311,7 +337,7 @@ action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number
 async function toggleAnnotations(){preferences.annotations=!preferences.annotations;$('annotations-toggle').checked=preferences.annotations;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();status(preferences.annotations?'Annotations enabled':'Annotations hidden');}
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
 action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status("Annotation restored in its original case");});
-action('reset-filters',()=>{for(const id of ['search','type-filter','status-filter','domain-filter','date-filter'])$(id).value='';$('current-page-only').checked=false;page=0;renderList();});
+action('reset-filters',resetFilters);
 $('current-page-only').addEventListener('change',()=>{page=0;renderList();});
 const commandActions=[
   {id:'capture-page',label:"Save page as HTML"},

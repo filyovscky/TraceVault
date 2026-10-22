@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.4.1](releases/TraceVault-0.4.1.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.4.2](releases/TraceVault-0.4.2.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.1. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.2. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Use the **folder** icon to choose a workspace. The extension verifies access with a real write/read/delete probe. Choose an empty folder or an existing TraceVault workspace. Create a case using its code and title.
 
@@ -21,9 +21,9 @@ Hover an icon or focus it with the keyboard to see its English description. Icon
 | Header | Commands, open workspace tab, settings |
 | Capture | HTML document, visible-area camera, full-page PNG scan, PDF document |
 | Annotate selection | Highlight, quote, note, entity |
-| Case sections | Materials, annotations, entities, history |
+| Case sections | Materials, Highlights, Entities, History (visible names) |
 
-The active section has a labelled heading and an underlined icon. Search and filters apply only to the collection. Reset filters clears all active filters. A free note is available in Annotations. Record details provide preview, checksum verification, copy, export and other relevant actions; each has a tooltip.
+The active section has a labelled heading and an underlined icon. **Highlights** lists highlights, quotes and notes, with separate counts and a type filter. Search and filters are remembered separately for each section while the panel is open; Reset filters clears the current section. Empty lists distinguish missing records from filtered-out records and offer guidance or Clear filters. A free note is available in Highlights. Record details provide preview, checksum verification, copy, export and other relevant actions; each has a tooltip.
 
 Settings has five groups: **Appearance, Capture, Annotations, Keyboard shortcuts, Storage**. Use the checkmark to apply preferences. Closing the dialog discards unapplied theme/pause/size/global-visibility changes. The per-site visibility icon is an immediate action. Shortcut settings display actual Chrome assignments; unassigned internal browser actions are omitted.
 

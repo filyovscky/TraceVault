@@ -40,7 +40,7 @@ export function setActionLabel(button,label,name=button.dataset.icon || labelIco
   return button;
 }
 export function initControls(){
-  document.querySelectorAll('button[data-icon]').forEach(b=>setActionLabel(b,b.textContent.trim()));
+  document.querySelectorAll('button[data-icon]').forEach(b=>setActionLabel(b,b.textContent.trim(),undefined,b.hasAttribute('data-show-label')));
   document.querySelectorAll('dialog').forEach(dialog=>{const error=document.createElement('p');error.className='dialog-error';error.setAttribute('role','alert');error.hidden=true;const host=dialog.querySelector('form') || dialog,actions=host.querySelector('.dialog-actions');if(actions)actions.before(error);else host.append(error);dialog.addEventListener('close',()=>{error.textContent='';error.hidden=true;});});
   const tip=document.getElementById('ui-tooltip');let owner;
   function hide(){tip.hidden=true;owner?.removeAttribute('aria-describedby');owner=null;}

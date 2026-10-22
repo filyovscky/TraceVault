@@ -1,5 +1,17 @@
 # Фактические проверки
 
+## 0.4.2 — collection discoverability and independent filters
+
+- Implemented labelled collection navigation, Highlights with type filter and accurate type counts, per-section in-session filter state, context-sensitive filter fields, distinct empty/filter-miss states, working Clear filters, and a simpler folder setup. No capture/storage model changes.
+- `npm run check`: ESLint, **15/15 unit tests**, clean build PASS. `git diff --check` PASS.
+- English UI regression PASS with native disk HTML write and independent Node SHA-256 check, real note save, preference reload, independent Materials/Highlights search state, annotation type filtering and restoration, working reset, empty Entities guidance, and no misleading reset action when the collection is empty.
+- Quote/entity/archive-reference/edit/orphan/tamper regression PASS. Two usability scenarios PASS: keyboard assignments/palette, clipboard, filters, Undo, checksum-tamper refusal, and active-case synchronization across documents. These are **4 browser scenarios PASS** in the final UI run.
+- Visual QA: actual screenshots at 320 and 420 CSS px in both themes, with horizontal overflow assertions PASS. Inspected dark 320 and light 420; checked visible navigation labels, icon alignment, counts, list and footer. Screenshots: `qa/0.4.2-dark-320.png`, `qa/0.4.2-light-420.png`. The screenshot driver now waits for the Settings dialog to finish saving/closing before capturing.
+- Initial context-highlight regression runs exposed a driver race: both the test workspace tab and a real native side panel consumed the durable inbox. Disk journals contained `annotation_created` and `command_completed` while the driver asserted status in the other document. The integration fixture now disables the native panel **only in its disposable QA profile**, using Chrome's real `sidePanel.setOptions({enabled:false})`; real action invocation, context handler, queue, selection hit testing and native disk writes remain in use. This test does not validate the OS context-menu popup or native side-panel opening. API reference: https://developer.chrome.com/docs/extensions/reference/api/sidePanel#type-PanelOptions.
+- One initial English UI run timed out waiting for Case created; its repeated final UI runs passed. This is recorded rather than counted as a clean first-run success.
+- Context-highlight integration after isolating the receiver: installed Chrome **PASS**, including immediate save, edit, delete, Undo, no-hit refusal, multi-paragraph selection, and original-byte/hash checks. CFT remains **FAIL by timeout**: one run exceeded the 5-second disk-count wait for a second annotation, and the final CFT run exceeded the 5-second CSS highlight wait after Undo. The second-annotation poll now uses 20 seconds and less aggressive disk polling; this did not make the final CFT run clean. No production capture/highlight logic was changed to conceal this issue. In total **5 distinct browser scenarios passed; 1 CFT context scenario remains unstable**. Native filesystem/notification completion timing needs separate diagnosis; a cause has not been established for the remaining CFT failure.
+- Limits: visible labels improve discoverability but no human usability study or timed performance benchmark was performed. Filter state survives section switches within the current panel, not a browser restart. Original capture-engine limitations remain as documented below.
+
 ## 0.4.1 — fixed headers and direct context highlights
 
 ### Architecture and implementation

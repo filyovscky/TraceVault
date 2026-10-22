@@ -9,6 +9,12 @@ for(const installed of [false,true])test(`context highlight saves without editor
   test.setTimeout(120000);const run=Date.now(),directory=path.resolve('output/playwright/highlight-workspace-'+run),context=await launch(path.resolve('output/playwright/highlight-profile-'+run),{installed}),fixture=await fixtureServer();
   try{
     const panel=await extensionPage(context);await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('HIGHLIGHT');await panel.locator('#case-title').fill('Direct context highlights');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
+    // This scenario drives the extension's workspace tab. Keep ONE inbox consumer:
+    // a real native side panel would process the same queue in another document,
+    // making this tab's status/editor assertions race even when disk saves succeed.
+    // Only this disposable QA profile is configured; action invocation still grants
+    // real activeTab. Native side-panel opening is outside this integration test.
+    await panel.evaluate(()=>chrome.sidePanel.setOptions({enabled:false}));
     const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('EVD-000001',{timeout:30000});
     const read=()=>panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return s.exclusive(()=>r.loadState(root,w,id));});
     const capture=Object.values((await read()).captures)[0],originalPath=path.join(directory,capture.artifacts[0].relative_path),original=await readFile(originalPath),sourceText=await source.locator('body').innerText();
@@ -23,7 +29,7 @@ for(const installed of [false,true])test(`context highlight saves without editor
     await rightClick('p');await menu('delete-highlight');await expect(panel.locator('#status')).toContainText('Highlight deleted');await expect.poll(highlightCount).toBe(0);expect((await read()).annotations[a.annotation_id].deleted).toBe(true);await expect(panel.locator('#undo-delete')).toBeVisible();
     await panel.locator('#undo-delete').click();await expect.poll(highlightCount).toBe(1);expect((await read()).annotations[a.annotation_id].deleted).toBe(false);
     await rightClick('h1');await menu('delete-highlight');await expect(panel.locator('#status')).toContainText('Right-click a visible TraceVault highlight');await expect.poll(highlightCount).toBe(1);expect((await read()).annotations[a.annotation_id].deleted).toBe(false);
-    await source.evaluate(()=>{const p=document.querySelectorAll('p'),range=document.createRange();range.setStart(p[0].firstChild,0);range.setEnd(p[1].firstChild,p[1].firstChild.length);getSelection().removeAllRanges();getSelection().addRange(range);});await menu('highlight');await expect.poll(async()=>Object.keys((await read()).annotations).length).toBe(2);await expect(panel.locator('#annotation-dialog')).not.toBeVisible();await expect.poll(highlightCount).toBe(2);
+    await source.evaluate(()=>{const p=document.querySelectorAll('p'),range=document.createRange();range.setStart(p[0].firstChild,0);range.setEnd(p[1].firstChild,p[1].firstChild.length);getSelection().removeAllRanges();getSelection().addRange(range);});await menu('highlight');await expect.poll(async()=>Object.keys((await read()).annotations).length,{timeout:20000,intervals:[500,1000]}).toBe(2);await expect(panel.locator('#annotation-dialog')).not.toBeVisible();await expect.poll(highlightCount).toBe(2);
     expect(await source.locator('body').innerText()).toBe(sourceText);expect(await readFile(originalPath)).toEqual(original);expect(createHash('sha256').update(await readFile(originalPath)).digest('hex')).toBe(capture.artifacts[0].sha256);
     await writeFile(path.resolve(`output/highlight-context-${installed?'installed':'cft'}.json`),JSON.stringify({directory,annotation:(await read()).annotations[a.annotation_id],capture,command_id:command.id},null,2));
   }finally{await context.close();fixture.server.close();}

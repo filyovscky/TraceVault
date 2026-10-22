@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — discoverable collections, 22.10.2026
+
+- Visible names under the four collection icons: Materials, Highlights, Entities, History. Action toolbars remain icon-only. Highlights contains an explicit breakdown of highlights, quotes and notes, with a type filter and type labels on records.
+- Search, type, status, domain, date and current-page filters are retained independently for each section while the panel is open. Capture-only fields are hidden outside Materials. Filter count and reset state reflect the active section.
+- Empty collections explain how to add a record. Filtered-out records offer a working Clear filters action. Empty lists hide pagination; changing sections closes unrelated record details.
+- First launch presents Choose workspace folder as a labelled action; the optional layout choice is tucked into Folder layout with an explanation. No storage/schema/permission or capture-engine changes.
+
 ## 0.4.1 — fixed headers and direct highlights, 22.10.2026
 
 - Full-page capture shows viewport-fixed roots once and returns sticky nodes to their natural flow temporarily. Overlap-safe source-pixel patches preserve the single header/footer occurrence. Capture method v2 records frame crop rectangles, visible/hidden roots, normalization and restoration results; existing evidence is untouched.
