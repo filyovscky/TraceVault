@@ -2,10 +2,16 @@ import {test} from 'node:test';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {planTiles} from '../extension/screenshot.js';
+import {resourceCredentials} from '../extension/capture.js';
 import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from '../extension/domain.js';
 
 test('shipped UI, manifest and runtime messages are English; archived content is external data',async()=>{for(const file of (await readdir('extension')).filter(f=>/\.(js|html|json)$/u.test(f)))assert.doesNotMatch(await readFile('extension/'+file,'utf8'),/[А-Яа-яЁё]/u,file);});
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
+test('resource credentials keep source authentication and omit cross-origin cookies',()=>{
+  assert.equal(resourceCredentials('https://site.test/private.png','https://site.test/page'),'include');
+  for(const url of ['https://fonts.googleapis.com/css2?family=Inter','https://cdn.site.test/font.woff2','http://site.test/image','https://site.test:8443/image'])assert.equal(resourceCredentials(url,'https://site.test/page'),'omit');
+  assert.equal(resourceCredentials('bad url','https://site.test'),'omit');
+});
 test('full screenshot tiles cover both axes, clamp final overlap and reject oversized allocations',()=>{const p=planTiles(1500,2400,800,600,1.25);assert.equal(p.width,1875);assert.equal(p.height,3000);assert.equal(p.tiles.length,10);assert.deepEqual(p.tiles.at(-1),{x:700,y:1800});assert.equal(planTiles(800,600,800,600).tiles.length,1);assert.throws(()=>planTiles(10000,10000,800,600));assert.throws(()=>planTiles(500,500,0,600));assert.throws(()=>planTiles(100,100000,800,600,0.1));});
 test('portable paths reject traversal and Windows reserved characters',()=>{for(const bad of ['../a','/a','a\\b','C:/a','a//b','a/../x','a.','a/'])assert.throws(()=>safePath(bad));assert.deepEqual(safePath('cases/abc/captures/1.html'),['cases','abc','captures','1.html']);});
 test('conservative normalization preserves email local part and phone context',()=>{assert.equal(normalize('email','User.Name@EXAMPLE.COM'),'User.Name@example.com');assert.equal(normalize('phone','8 (900) 123-45-67'),'8 (900) 123-45-67');assert.equal(normalize('domain','ПРИМЕР.РФ'),'xn--e1afmkfd.xn--p1ai');assert.equal(normalize('person','Иван Иванов'),'Иван Иванов');});

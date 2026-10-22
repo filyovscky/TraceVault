@@ -3,9 +3,12 @@ import {writeNew, readFile, readVerifiedFile, exclusive} from './storage.js';
 import {fullScreenshot,screenshot} from './screenshot.js';
 import {pngToPdf} from './pdf.js';
 import {append, casePath, loadState} from './repository.js';
-import {snapshotDocument, buildArchive} from './capture.js';
+import {snapshotDocument, buildArchive,resourceCredentials} from './capture.js';
 
-export async function inject(tabId) {await chrome.scripting.executeScript({target:{tabId},files:['content.js']});}
+export async function inject(tabId) {
+  try{await chrome.scripting.executeScript({target:{tabId},files:['content.js']});}
+  catch(e){if(/Cannot access contents of (?:url|the page)|must request permission|Missing host permission/iu.test(e.message || '')){const error=new Error('Chrome needs access to this site. Use Enable site access (shield) or click the TraceVault extension icon, then repeat the action.');error.name='SiteAccessError';throw error;}throw e;}
+}
 export async function selected(tabId) {await inject(tabId);return chrome.tabs.sendMessage(tabId,{type:'TV_SELECTION'});}
 export async function registerAnnotationSites(origins) {
   for(const origin of origins)if(!await chrome.permissions.contains({origins:[origin]}))throw new Error("Annotation restore permission missing: "+origin);
@@ -44,7 +47,7 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
         record.warnings=archive.diagnostics;
       } else if(kind==='image') {
         if(!/^https?:\/\//u.test(imageUrl || '')) throw new Error("Image has no HTTP/HTTPS source; it may use a blob or data URL");
-        const response=await fetch(imageUrl,{credentials:'include',signal:signal ? AbortSignal.any([signal,AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),referrerPolicy:'no-referrer'});
+        const response=await fetch(imageUrl,{credentials:resourceCredentials(imageUrl,tab.url),signal:signal ? AbortSignal.any([signal,AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),referrerPolicy:'no-referrer'});
         if(!response.ok)throw new Error("Image fetch failed: HTTP "+response.status);
         mime=(response.headers.get('content-type') || '').split(';')[0];
         const extensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp','image/svg+xml':'svg','image/avif':'avif','image/bmp':'bmp','image/x-icon':'ico'};

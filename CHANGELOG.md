@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3 — resource CORS and site access, 22.10.2026
+
+- Archive resources and original images use credentialed fetch only on the source page's origin. Cross-origin public CSS/fonts/images use anonymous fetch, compatible with `Access-Control-Allow-Origin: *`. Missing resources still produce partial-capture diagnostics.
+- Panel Capture/Annotate actions request optional permission for the current site directly inside the button gesture when no working access has been observed. The source is rechecked after permission approval. Existing activeTab access avoids the request; denied access does not start a capture.
+- Missing-host injection errors carry an actionable SiteAccessError with shield/icon recovery instructions. Expected permission refusals stay in the status UI rather than being logged as internal exceptions. Permission changes invalidate observed access and refresh source state.
+- Corrected the collector version constant to match the release; existing evidence metadata is unchanged.
+
 ## 0.4.2 — discoverable collections, 22.10.2026
 
 - Visible names under the four collection icons: Materials, Highlights, Entities, History. Action toolbars remain icon-only. Highlights contains an explicit breakdown of highlights, quotes and notes, with a type filter and type labels on records.

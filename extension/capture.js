@@ -1,4 +1,7 @@
 // Independent implementation. No SingleFile code is included.
+export function resourceCredentials(url,sourceUrl){
+  try{return new URL(url).origin===new URL(sourceUrl).origin?'include':'omit';}catch{return 'omit';}
+}
 export function snapshotDocument(maxBytes=64*1024*1024) {
   const warnings=[];
   function snapshot(doc, depth=0) {
@@ -56,7 +59,7 @@ export async function buildArchive(snapshot, {signal, maxBytes=64*1024*1024, onP
     const promise=(async()=>{
       try {
         const timeout=AbortSignal.timeout(12000), combined=signal ? AbortSignal.any([signal,timeout]) : timeout;
-        const response=await fetch(url,{credentials:'include',signal:combined,redirect:'follow',referrerPolicy:'no-referrer'});
+        const response=await fetch(url,{credentials:resourceCredentials(url,snapshot.url || snapshot.base),signal:combined,redirect:'follow',referrerPolicy:'no-referrer'});
         if(!response.ok) throw new Error('HTTP '+response.status);
         if(Number(response.headers.get('content-length'))>maxBytes-total) throw new Error('Resource exceeds operation limit');
         const reader=response.body.getReader(),chunks=[];

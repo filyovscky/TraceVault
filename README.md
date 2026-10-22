@@ -4,13 +4,13 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.4.2](releases/TraceVault-0.4.2.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.4.3](releases/TraceVault-0.4.3.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.2. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.3. The `tabs` metadata permission introduced in 0.3.2 may require confirmation when updating an older version.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Use the **folder** icon to choose a workspace. The extension verifies access with a real write/read/delete probe. Choose an empty folder or an existing TraceVault workspace. Create a case using its code and title.
 
-On a new site, click the extension icon or use a capture shortcut to grant temporary `activeTab`. A click inside an already-open panel does not grant that permission. The shield action grants optional annotation auto-restore for the current site. URL/title tracking works independently of capture permission and workspace access.
+On a new site, clicking Capture/Annotate in the panel requests optional access for that site if working access has not been observed. Chrome may show its permission prompt. Alternatively, click the extension icon or use a capture shortcut to grant temporary `activeTab`. The shield action grants site access and enables annotation auto-restore. URL/title tracking works independently of capture permission and workspace access.
 
 ## Find an action
 
