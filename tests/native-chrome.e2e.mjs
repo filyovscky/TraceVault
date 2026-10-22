@@ -27,6 +27,11 @@ test('installed Chrome 155: capture APIs, panel config, light/dark and 32 HiDPI 
     await sideCommand('Runtime.runIfWaitingForDebugger');
     const actual=await sideCommand('Runtime.evaluate',{expression:'({width:innerWidth,url:location.href,picker:typeof showDirectoryPicker,html:document.querySelector("header strong").textContent})',returnByValue:true});expect(actual.result.value.html).toBe('TraceVault');expect(actual.result.value.picker).toBe('function');
     await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("folder-state").textContent',returnByValue:true});return result.result.value;},{timeout:15000}).toContain('Доступ к записи');
+    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("status").textContent',returnByValue:true});return result.result.value;}).toBe('Рабочая папка подключена');
+    await source.goto(fixture.url.replace('127.0.0.1','localhost')+'/side-panel-navigation');
+    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'document.getElementById("source-url").textContent',returnByValue:true});return result.result.value;}).toBe(source.url());
+    await source.evaluate(()=>{history.pushState({},'','/side-panel-spa');document.title='Side Panel SPA';});
+    await expect.poll(async()=>{const result=await sideCommand('Runtime.evaluate',{expression:'[document.getElementById("source-title").textContent,document.getElementById("source-url").textContent]',returnByValue:true});return result.result.value;}).toEqual(['Side Panel SPA',fixture.url.replace('127.0.0.1','localhost')+'/side-panel-spa']);
     const sidePng=await sideCommand('Page.captureScreenshot',{format:'png'});await writeFile(path.resolve('output/playwright/native-side-panel.png'),Buffer.from(sidePng.data,'base64'));await browserCDP.send('Target.detachFromTarget',{sessionId});
     const cdp=await context.newCDPSession(panel),layouts=[];
     await panel.locator('#close-details').click();

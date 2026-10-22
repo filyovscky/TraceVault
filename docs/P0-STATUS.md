@@ -1,11 +1,11 @@
-# Матрица приёмки 0.1.0
+# Матрица приёмки, актуализация 0.3.2
 
 PASS означает проверенный сценарий в границах описанного теста. Ручные/непроверенные границы остаются явными; все возможные сайты не сертифицированы.
 
 | Критерий | Фактическое покрытие | Статус |
 |---|---|---|
 | AC-01: выбранная папка, три HTML | Реальная FSA запись, Node readback, три fixture и три public origins; Downloads API не используется | PASS автоматизированного дискового сценария; OS picker вручную |
-| AC-02: отозванный доступ | query/requestPermission, no fallback; denied fault injection не создаёт файл | Автотест адаптера PASS; реальный отзыв через UI вручную |
+| AC-02: отозванный доступ | query/requestPermission, denied без нового материала; reload с prompt → Save → прежнее дело и 2 HTML с SHA-256; источник обновляется при отказе | Fault injection + native FSA PASS; нативный bubble/реальный отзыв через UI вручную |
 | AC-03: offline HTML | file:// offline, SVG/CSS/background, раскрытый DOM, отсутствие HTTP загрузок/scripts | PASS fixture; сложные сайты best effort |
 | AC-04: точное время | UTC/zone/ms и отдельные started/finished/write поля в реальном Capture | PASS |
 | AC-05: выделение, toggle, restart | CSS Highlights, тексты не меняются, registered script с выданным доменным доступом, restart процесса | PASS; разрешение в QA выдано тестовым manifest, prompt вручную |

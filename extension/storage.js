@@ -41,8 +41,25 @@ export async function writeNew(root,path,data,mime='application/json') {
   const bytes = data instanceof Blob ? await data.arrayBuffer() : new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data,null,2));
   const before = await sha256(bytes);
   const started = now();
-  const handle = await fileHandle(root,path,true), writable = await handle.createWritable();
-  try { await writable.write(bytes); await writable.close(); } catch(e) { try { await writable.abort(); } catch { /* already closed */ } throw e; }
+  let handle=await fileHandle(root,path,true),retries=0;
+  for(;;){
+    let writable,stage='createWritable';
+    try {writable=await handle.createWritable();stage='write';await writable.write(bytes);stage='close';await writable.close();break;}
+    catch(e){
+      try {await writable?.abort();}catch{/* The browser may already have closed the stream. */}
+      // Windows/Chromium can reject close() with InvalidStateError and leave the
+      // fresh destination empty. Never overwrite any previously saved bytes, or
+      // retry a permission/quota failure. Only this call's same empty entry may retry.
+      const retryable=e.name==='InvalidStateError' && retries<2;
+      if(!retryable){console.error('TraceVault disk write:',path,stage,e);throw e;}
+      const current=await fileHandle(root,path),file=await current.getFile();
+      if(file.size!==0 || !await current.isSameEntry(handle)){console.error('TraceVault disk write:',path,stage,e);throw e;}
+      retries++;console.warn('TraceVault: retrying fresh empty file',path,stage,retries,e.name);
+      await new Promise(resolve=>setTimeout(resolve,50*retries));
+      if(await root.queryPermission({mode:'readwrite'})!=='granted')throw new DOMException('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».','NotAllowedError');
+      handle=current;
+    }
+  }
   const written = now(), stored = await handle.getFile(), after = await sha256(await stored.arrayBuffer());
   if (before !== after || stored.size !== bytes.byteLength) throw new Error('Проверка записанного файла не пройдена: '+path);
   return {artifact_id:uuid(), relative_path:path, mime_type:mime, byte_length:stored.size, sha256:after, created_at:started, artifact_write_started_at:started, written_at:written, verification_status:'verified_readback',time_context:clock()};

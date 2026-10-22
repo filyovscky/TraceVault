@@ -1,31 +1,43 @@
-import {setting,openWorkspace,exclusive,readJSON,readVerifiedFile,writeNew,probe} from './storage.js';
+import {setting,openWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
-import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,captureExclusion,captureHostList} from './domain.js';
+import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
 const $=id=>document.getElementById(id);
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
-let preferences={theme:'system',paused:false,blockedDomains:['mail.google.com','outlook.live.com','outlook.office.com','vault.bitwarden.com','online.sberbank.ru','online.vtb.ru'],allowedCaptureHosts:[],hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
+let preferences={theme:'system',paused:false,hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
 const statuses={};
 const sessionId=uuid();
-let syncRevision=0,lastDeleted=null;
+let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 function status(message,error=false) {$('status').textContent=message;$('status').parentElement.dataset.error=String(error);}
+async function reportError(e){console.error('TraceVault:',e);status(errorText(e),true);if(root)try{await renderFolder();}catch{/* Keep the original error; source navigation stays independent. */}}
 function errorText(e) {
   if(e.name==='AbortError') return 'Операция отменена';
   if(e.name==='QuotaExceededError') return 'Недостаточно места или превышена квота. Освободите место и повторите.';
   if(e.name==='NotAllowedError') return 'Нет доступа к рабочей папке или сайту. Восстановите соответствующее разрешение.';
-  if(e.name==='InvalidStateError') return 'Не удалось восстановить доступ к папке из браузера. Выберите существующую рабочую папку снова; файлы на диске сохраняются.';
+  if(e.name==='InvalidStateError') return 'Chrome не завершил файловую операцию. Успех не подтверждён. Проверьте состояние рабочей папки; повторный выбор папки не исправляет повреждённые файлы.';
   return e.message || String(e);
 }
-function action(id,fn) {$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(errorText(e),true)));}
+function action(id,fn) {$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(reportError));}
 function el(tag,text,cls) {const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
-function button(label,fn) {const b=el('button',label);b.addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(errorText(e),true)));return b;}
+function button(label,fn) {const b=el('button',label);b.addEventListener('click',()=>Promise.resolve().then(fn).catch(reportError));return b;}
 function field(dl,label,value,cls) {dl.append(el('dt',label),el('dd',value ?? '—',cls));}
 function link(url,label) {const a=el('a',label);if(/^https?:\/\//u.test(url||'')){a.href=url;a.target='_blank';a.rel='noreferrer noopener';}return a;}
 function context() {if(!root || !workspace || !activeCase) throw new Error('Выберите рабочую папку и активное дело');return {root,workspace,caseId:activeCase};}
-async function canWrite() {preferences={...preferences,...await setting('preferences')};context();if(await root.queryPermission({mode:'readwrite'})!=='granted') throw new Error('Нет доступа к рабочей папке. Нажмите «Разрешить доступ».');}
+async function readPreferences(){const stored=await setting('preferences');const cleaned=removeLegacyCaptureFilters(stored);if(stored && ('blockedDomains' in stored || 'allowedCaptureHosts' in stored))await setting('preferences',cleaned);preferences={...preferences,...cleaned};}
+async function canWrite() {
+  if(!root)throw new Error('Выберите рабочую папку');
+  const needsReconnect=!workspace || !activeCase,permission=await root.queryPermission({mode:'readwrite'});
+  if(permission!=='granted'){
+    await renderFolder();
+    if(!navigator.userActivation.isActive)throw new Error('Chrome ожидает разрешение на запись в папку. Нажмите «Разрешить доступ» вверху панели.');
+    if(await root.requestPermission({mode:'readwrite'})!=='granted'){await renderFolder();throw new Error('Chrome не разрешил запись в папку. Нажмите «Разрешить доступ» или выберите эту же папку снова.');}
+    await connect(root);
+  }else if(needsReconnect)await connect(root);
+  await readPreferences();context();
+}
 async function refresh() {
-  if(activeCase && root) {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root){state=fresh;await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);}}
+  if(activeCase && root && await root.queryPermission({mode:'read'})==='granted') {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root){state=fresh;await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);}}
   renderList();await renderFolder();
 }
 async function renderFolder() {
@@ -59,30 +71,32 @@ async function currentTab() {
   return tabs[0] || null;
 }
 async function refreshSource() {
-  preferences={...preferences,...await setting('preferences')};
-  if(activeCase && root && workspace) {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root)state=fresh;}
-  tab=await currentTab();
-  if(tab && /^https?:/u.test(tab.url || '')) await setting('sourceTab:'+tab.windowId,tab.id);
-  const excluded=tab?.url?captureExclusion(tab.url,preferences):null;$('capture-exclusion').hidden=!excluded;$('capture-exclusion-reason').textContent=excluded?`Фиксация ${new URL(tab.url).hostname} отключена правилом «${excluded}» в настройках TraceVault.`:'';
+  const revision=++sourceRevision,source=await currentTab();if(revision!==sourceRevision)return;tab=source;
   $('source-title').textContent=tab?.title || 'Откройте HTTP/HTTPS сайт';$('source-url').textContent=tab?.url || 'Доступ к URL пока не выдан';$('source-url').title=tab?.url || '';
+  if(tab && /^https?:/u.test(tab.url || ''))await setting('sourceTab:'+tab.windowId,tab.id);
+  if(revision!==sourceRevision)return;
   let permitted=false;
   if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[hostPattern(tab.url)]});
-  $('site-state').textContent=permitted?'Автовосстановление аннотаций включено':tab?.url?'':'Для доступа нажмите значок TraceVault на открытом сайте.';
+  if(revision!==sourceRevision)return;
+  $('site-state').textContent=permitted?'Автовосстановление аннотаций включено':/^https?:/u.test(tab?.url || '')?'Для захвата на новом сайте нажмите значок TraceVault или горячую клавишу.':'Откройте HTTP/HTTPS сайт.';
   $('grant-site').textContent='Разрешить восстановление на этом сайте';
   $('grant-site').hidden=permitted || !/^https?:/u.test(tab?.url || '');
   $('site-annotations').hidden=!/^https?:/u.test(tab?.url || '');
   const siteHidden=/^https?:/u.test(tab?.url || '') && preferences.hiddenAnnotationDomains.includes(new URL(tab.url).hostname);
   $('site-annotations').textContent=siteHidden?'Показывать аннотации на этом сайте':'Скрыть аннотации на этом сайте';
-  if(tab?.id) {
-    try {await inject(tab.id);const data=await chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:Object.values(state.annotations).filter(a=>a.source_url===tab.url && !a.deleted),enabled:preferences.annotations && !siteHidden});Object.assign(statuses,data?.statuses);}catch { /* UI explains missing permission */ }
+  if(activeCase && root && workspace && await root.queryPermission({mode:'read'})==='granted'){const c=context();try{const fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(revision!==sourceRevision)return;if(activeCase===c.caseId && root===c.root)state=fresh;}catch(e){await renderFolder();if(revision===sourceRevision)status(errorText(e),true);}}
+  if(revision!==sourceRevision)return;
+  if(source?.id) {
+    try {await inject(source.id);if(revision!==sourceRevision)return;const data=await chrome.tabs.sendMessage(source.id,{type:'TV_RENDER',annotations:Object.values(state.annotations).filter(a=>a.source_url===source.url && !a.deleted),enabled:preferences.annotations && !siteHidden});if(revision===sourceRevision)Object.assign(statuses,data?.statuses);}catch { /* UI explains missing permission */ }
   }
-  renderList();
+  if(revision===sourceRevision)renderList();
 }
 async function runCapture(kind='page',command=null) {
+  const requested=command?.tabId?await chrome.tabs.get(command.tabId):await currentTab();
   await canWrite();if(busy)throw new Error('Дождитесь текущего захвата');
-  const c=context(),sourceId=command?.tabId || tab?.id;if(command?.caseId)c.caseId=command.caseId;if(!sourceId)throw new Error('Не выбрана вкладка');
+  const c=context(),sourceId=requested?.id;if(command?.caseId)c.caseId=command.caseId;if(!sourceId)throw new Error('Не выбрана вкладка');
   if(!cases.some(item=>item.case_id===c.caseId))throw new Error('Дело команды отсутствует в выбранной рабочей папке. Вернитесь в исходную папку или повторите команду.');
-  const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);if(command?.sourceUrl && source.url!==command.sourceUrl)throw new Error('Вкладка изменила URL после постановки команды в очередь');
+  const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);if(source.url!==requested.url)throw new Error('Источник изменился во время получения доступа. Повторите действие.');if(command?.sourceUrl && source.url!==command.sourceUrl)throw new Error('Вкладка изменила URL после постановки команды в очередь');
   busy=true;controller=new AbortController();$('cancel').hidden=false;setBusy(true);
   try {
     const result=await capture({...c,tabId:sourceId,id:command?.id,imageUrl:command?.imageUrl,kind,settings:preferences,signal:controller.signal,onProgress:message=>status(t(message))});
@@ -93,9 +107,9 @@ async function runCapture(kind='page',command=null) {
 }
 function setBusy(value) {for(const id of ['capture-page','capture-screen','capture-full','capture-pdf','archive-first','pick-root','change-root'])$(id).disabled=value;}
 async function beginAnnotation(actionName,command=null) {
-  await canWrite();const c=context(),sourceId=command?.tabId || tab?.id;if(command?.caseId)c.caseId=command.caseId;
+  const requested=command?.tabId?await chrome.tabs.get(command.tabId):await currentTab();await canWrite();const c=context(),sourceId=requested?.id;if(command?.caseId)c.caseId=command.caseId;
   let data=null;
-  if(sourceId && actionName!=='manual'){const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);data=await selected(sourceId);}
+  if(sourceId && actionName!=='manual'){const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);if(source.url!==requested.url)throw new Error('Источник изменился во время получения доступа. Повторите действие.');data=await selected(sourceId);}
   const sel=data?.selection;
   if(actionName!=='manual' && !sel?.exact) throw new Error('Выделите текст на странице; поля ввода и редакторы исключены');
   if(command?.selectionText && sel.exact!==command.selectionText) throw new Error('Выделение изменилось с момента вызова меню. Выделите текст снова.');
@@ -245,12 +259,11 @@ async function processInbox() {
 }
 action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle,$('workspace-mode').value);status('Доступ проверен записью и чтением тестового файла');});
 action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle);status('Рабочая папка подключена');});
-action('reauthorize',async()=>{if(await root.requestPermission({mode:'readwrite'})!=='granted')throw new Error('Доступ не предоставлен');await exclusive(()=>probe(root));await connect(root);status('Доступ к папке восстановлен и проверен');});
+action('reauthorize',async()=>{if(!root)throw new Error('Выберите рабочую папку');if(await root.requestPermission({mode:'readwrite'})!=='granted'){await renderFolder();throw new Error('Chrome не разрешил запись в папку. Выберите эту же папку снова кнопкой «Сменить папку».');}await connect(root);status('Доступ к папке восстановлен и проверен записью и чтением');});
 action('new-case',()=>{if(!root)throw new Error('Сначала выберите папку');$('case-dialog').showModal();});
-$('case-form').addEventListener('submit',event=>{event.preventDefault();(async()=>{const c=await exclusive(()=>createCase(root,workspace,$('case-title').value,$('case-code').value));cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status('Дело создано');await processInbox();})().catch(e=>status(errorText(e),true));});
+$('case-form').addEventListener('submit',event=>{event.preventDefault();(async()=>{const c=await exclusive(()=>createCase(root,workspace,$('case-title').value,$('case-code').value));cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status('Дело создано');await processInbox();})().catch(reportError);});
 $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
-action('allow-capture-site',async()=>{const source=await currentTab();if(!/^https?:/u.test(source?.url || ''))throw new Error('Откройте исходный HTTP/HTTPS сайт');const host=new URL(source.url).hostname.toLowerCase().replace(/\.$/u,'');preferences={...preferences,...await setting('preferences')};preferences.allowedCaptureHosts=[...new Set([...(preferences.allowedCaptureHosts || []),host])];await setting('preferences',preferences);$('allowed-capture-hosts').value=preferences.allowedCaptureHosts.join('\n');await refreshSource();status(`Фиксация ${host} разрешена. Другие исключения сохранены.`);});
 action('grant-site',async()=>{
   if(!/^https?:/u.test(tab?.url || ''))throw new Error('Нет доступного HTTP/HTTPS URL');
   const origin=hostPattern(tab.url);
@@ -274,7 +287,7 @@ action('workspace',()=>chrome.tabs.create({url:chrome.runtime.getURL('panel.html
 action('settings-toggle',()=>{$('settings').hidden=!$('settings').hidden;$('settings-toggle').setAttribute('aria-expanded',String(!$('settings').hidden));});
 action('shortcuts',()=>chrome.tabs.create({url:'chrome://extensions/shortcuts'}));
 $('theme').addEventListener('change',()=>{document.documentElement.dataset.theme=$('theme').value;});
-action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024,blockedDomains:captureHostList($('blocked-domains').value),allowedCaptureHosts:captureHostList($('allowed-capture-hosts').value)};await setting('preferences',preferences);await refreshSource();status('Настройки сохранены');});
+action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024};await setting('preferences',preferences);await refreshSource();status('Настройки сохранены');});
 $('annotations-toggle').addEventListener('change',()=>{(async()=>{preferences.annotations=$('annotations-toggle').checked;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
 action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status('Аннотация восстановлена в исходном деле');});
@@ -332,17 +345,22 @@ chrome.storage.onChanged.addListener(changes=>{
     (async()=>{const found=await exclusive(()=>listCases(root,workspace));if(revision!==syncRevision)return;cases=found;await setCases(false);await refresh();await refreshSource();if(pending)status('Дело изменено в другом окне. Открытый редактор сохранит исходное дело.');})().catch(e=>status(errorText(e),true));
   }
 });
-chrome.tabs.onActivated.addListener(()=>refreshSource().catch(()=>{}));
-chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.status==='complete')refreshSource().catch(()=>{});});
+function scheduleSource(){clearTimeout(sourceTimer);sourceTimer=setTimeout(()=>refreshSource().catch(e=>status(errorText(e),true)),80);}
+chrome.tabs.onActivated.addListener(scheduleSource);
+chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.url || info.title || info.status)scheduleSource();});
+chrome.tabs.onRemoved.addListener(scheduleSource);
+window.addEventListener('focus',scheduleSource);
 async function init() {
   if(new URL(location.href).searchParams.has('workspace'))document.body.classList.add('workspace');
-  preferences={...preferences,...await setting('preferences')};document.documentElement.dataset.theme=preferences.theme;$('theme').value=preferences.theme;$('paused').checked=preferences.paused;$('blocked-domains').value=preferences.blockedDomains.join('\n');$('allowed-capture-hosts').value=(preferences.allowedCaptureHosts || []).join('\n');$('max-size').value=preferences.maxBytes/1024/1024;$('annotations-toggle').checked=preferences.annotations;
+  await readPreferences();document.documentElement.dataset.theme=preferences.theme;$('theme').value=preferences.theme;$('paused').checked=preferences.paused;$('max-size').value=preferences.maxBytes/1024/1024;$('annotations-toggle').checked=preferences.annotations;
   const handle=await setting('root');
   if(handle) {
     root=handle;
-    if(await root.queryPermission({mode:'readwrite'})==='granted')await connect(root);
-    else {workspace=await readJSON(root,'workspace.json').catch(()=>null);await renderFolder();status('Требуется повторный доступ к папке',true);}
+    if(await root.queryPermission({mode:'readwrite'})==='granted'){await connect(root);if($('status').textContent==='Инициализация…')status(activeCase?'Рабочая папка подключена':'Рабочая папка подключена. Создайте дело');}
+    else {await renderFolder();status('Chrome ожидает разрешение на запись в выбранную папку. Нажмите «Сохранить страницу» или «Разрешить доступ».',true);}
   } else status('Выберите папку, затем создайте дело');
   await refreshShortcuts();await refreshSource();await processInbox();
 }
-init().catch(e=>status(errorText(e),true));
+$('pick-root').disabled=true;
+refreshSource().catch(()=>{});
+init().catch(e=>status(errorText(e),true)).finally(()=>{$('pick-root').disabled=false;});

@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+Версия 0.3.2: [Side Panel после cross-origin и SPA](0.3.2-side-panel.png), [светлая тема 320 px/DPR 2](0.3.2-light-320-2.png), [два файла после восстановления доступа](0.3.2-access-restored.png). Отдельная повторная проверка 32 layout-комбинаций прошла; ранние снимки ниже оставлены как история QA.
+
 Снято из установленного Chrome 155.0.8059.85 на Windows, не рендер-макет.
 
 - [Нативный Side Panel](native-side-panel.png): отдельный target с runtime contextType SIDE_PANEL, текущая папка подтверждена в его DOM.
