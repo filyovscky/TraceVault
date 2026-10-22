@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TraceVault",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Локальная фиксация веб-материалов с SHA-256, аннотациями и источниками Entity.",
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus", "sidePanel"],
@@ -12,10 +12,10 @@
   "side_panel": {"default_path": "panel.html"},
   "options_page": "panel.html?workspace=1",
   "commands": {
-    "capture-page": {"suggested_key": {"default": "Alt+Shift+S"}, "description": "Сохранить страницу"},
-    "capture-screen": {"suggested_key": {"default": "Alt+Shift+P"}, "description": "Скриншот видимой области"},
-    "open-panel": {"suggested_key": {"default": "Alt+Shift+V"}, "description": "Открыть панель"},
-    "add-highlight": {"description": "Сохранить выделение"}
+    "capture-page": {"suggested_key": {"default": "Ctrl+Shift+1"}, "description": "TraceVault: сохранить HTML"},
+    "capture-screen": {"suggested_key": {"default": "Ctrl+Shift+2"}, "description": "TraceVault: скриншот PNG"},
+    "open-panel": {"suggested_key": {"default": "Ctrl+Shift+3"}, "description": "TraceVault: открыть панель"},
+    "add-highlight": {"suggested_key": {"default": "Ctrl+Shift+4"}, "description": "TraceVault: выделить цитату"}
   },
   "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'; frame-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"}
 }

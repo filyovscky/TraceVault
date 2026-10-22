@@ -1,6 +1,6 @@
-import {setting,openWorkspace,exclusive,readJSON,readFile,writeNew,probe} from './storage.js';
+import {setting,openWorkspace,exclusive,readJSON,readVerifiedFile,writeNew,probe} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
-import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256} from './domain.js';
+import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,registerAnnotationSites} from './service.js';
 import {t} from './i18n.js';
 const $=id=>document.getElementById(id);
@@ -8,6 +8,7 @@ let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotat
 let preferences={theme:'system',paused:false,blockedDomains:['mail.google.com','outlook.live.com','outlook.office.com','vault.bitwarden.com','online.sberbank.ru','online.vtb.ru'],hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true};
 const statuses={};
 const sessionId=uuid();
+let syncRevision=0,lastDeleted=null;
 function status(message,error=false) {$('status').textContent=message;$('status').parentElement.dataset.error=String(error);}
 function errorText(e) {
   if(e.name==='AbortError') return 'Операция отменена';
@@ -41,25 +42,26 @@ async function connect(handle,mode='workspace') {
     root=handle;workspace=metadata;cases=found;
     if(recovered)status(`Обнаружены прерванные операции: ${recovered}. Проверьте историю и файлы.`,true);
   });
-  const saved=await setting('activeCase');activeCase=cases.some(c=>c.case_id===saved)?saved:cases[0]?.case_id || null;
+  const {activeContext}=await chrome.storage.local.get('activeContext'),saved=activeContext?.workspaceId===workspace.workspace_id?activeContext.caseId:await setting('activeCase');activeCase=cases.some(c=>c.case_id===saved)?saved:cases[0]?.case_id || null;
   await setCases();await refresh();if(!cases.length)$('case-dialog').showModal();
 }
-async function setCases() {
+async function setCases(publish=true) {
   $('case-select').replaceChildren(...cases.map(c=>{const o=el('option',c.code+' · '+c.title);o.value=c.case_id;o.title=c.title;return o;}));
-  if(activeCase){$('case-select').value=activeCase;$('case-select').title=cases.find(c=>c.case_id===activeCase)?.title || '';await setting('activeCase',activeCase);}
+  if(activeCase){$('case-select').value=activeCase;$('case-select').title=cases.find(c=>c.case_id===activeCase)?.title || '';await setting('activeCase',activeCase);if(publish)await chrome.storage.local.set({activeCase,activeContext:{workspaceId:workspace.workspace_id,caseId:activeCase,owner:sessionId,revision:uuid()}});}
 }
 async function currentTab() {
-  const tabs=await chrome.tabs.query({active:true,lastFocusedWindow:true});
+  const window=await chrome.windows.getCurrent(),tabs=await chrome.tabs.query({active:true,windowId:window.id});
   if(tabs[0]?.url?.startsWith('chrome-extension:')) {
-    const stored=await setting('sourceTab');
-    if(stored) return chrome.tabs.get(stored).catch(()=>null);
+    const stored=await setting('sourceTab:'+window.id) || await setting('sourceTab');
+    if(stored){const candidate=await chrome.tabs.get(stored).catch(()=>null);if(candidate?.windowId===window.id)return candidate;}
+    return null;
   }
   return tabs[0] || null;
 }
 async function refreshSource() {
   if(activeCase && root && workspace) {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root)state=fresh;}
   tab=await currentTab();
-  if(tab && /^https?:/u.test(tab.url || '')) await setting('sourceTab',tab.id);
+  if(tab && /^https?:/u.test(tab.url || '')) await setting('sourceTab:'+tab.windowId,tab.id);
   $('source-title').textContent=tab?.title || 'Откройте HTTP/HTTPS сайт';$('source-url').textContent=tab?.url || 'Доступ к URL пока не выдан';$('source-url').title=tab?.url || '';
   let permitted=false;
   if(/^https?:/u.test(tab?.url || '')) permitted=await chrome.permissions.contains({origins:[hostPattern(tab.url)]});
@@ -82,6 +84,7 @@ async function runCapture(kind='page',command=null) {
   busy=true;controller=new AbortController();$('cancel').hidden=false;setBusy(true);
   try {
     const result=await capture({...c,tabId:sourceId,id:command?.id,imageUrl:command?.imageUrl,kind,settings:preferences,signal:controller.signal,onProgress:message=>status(t(message))});
+    if(!['completed','partial'].includes(result.state)){status(`${t(result.state)} · ${result.error || 'Подтверждённого файла нет'}`,true);return result;}
     status(`${t(result.state)} · ${result.evidence_number} · ${result.artifacts[0].byte_length.toLocaleString('ru-RU')} байт`);
     if(c.caseId===activeCase){await refresh();showCapture(result.capture_id);}return result;
   } finally {busy=false;controller=null;$('cancel').hidden=true;setBusy(false);await refresh();}
@@ -135,8 +138,9 @@ function renderList() {
   rows=rows.filter(r=>{
     if(query && !JSON.stringify(r).toLocaleLowerCase('ru').includes(query))return false;
     if(view==='captures' && ((type && r.kind!==type) || (filter && r.state!==filter)))return false;
-    const url=r.source?.final_url || r.source_url || '';
-    if(domain && !url.toLowerCase().includes(domain))return false;
+    const urls=recordUrls(r,state.refs);
+    if(domain && !urls.some(url=>matchesDomain(url,domain)))return false;
+    if($('current-page-only').checked && !urls.includes(tab?.url))return false;
     const at=r.times?.capture_started_at || r.created_at || r.recorded_at;
     return !date || (at && at.slice(0,10)>=date);
   }).sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned) || (b.times?.capture_started_at || b.created_at || b.recorded_at || '').localeCompare(a.times?.capture_started_at || a.created_at || a.recorded_at || ''));
@@ -174,17 +178,18 @@ function showCapture(id) {
     const d=el('dl');field(d,'Файл',a.relative_path);field(d,'Размер',a.byte_length+' байт');field(d,'SHA-256',a.sha256,'hash');field(d,'Проверка при записи',a.verification_status);box.append(d);
     const row=el('div',undefined,'actions');row.append(button('Открыть файл',()=>openArtifact(a)),button('Проверить хеш',async()=>{const result=await verifyArtifact(root,workspace,c.case_id,a);status(result.ok?'SHA-256 подтверждён повторным чтением':'Хеш НЕ совпадает. Файл изменён: '+result.actual,!result.ok);}),button('Копировать SHA-256',()=>navigator.clipboard.writeText(a.sha256)),button('Экспорт оригинала',()=>exportOriginal(a,c.case_id)));box.append(row);
   }
-  const pin=button(c.pinned?'Открепить':'Закрепить',async()=>{await exclusive(()=>append(root,workspace,c.case_id,'capture_pinned','captures',{...c,pinned:!c.pinned}));await refresh();showCapture(id);});box.append(pin);
+  box.append(button('Копировать цитирование',async()=>{await navigator.clipboard.writeText(citation(c));status('Цитирование скопировано: URL, UTC, Capture ID и SHA-256');}));
+  const pin=button(c.pinned?'Открепить':'Закрепить',async()=>{await exclusive(async()=>{const fresh=await loadState(root,workspace,c.case_id);await append(root,workspace,c.case_id,'capture_pinned','captures',{...fresh.captures[id],pinned:!fresh.captures[id].pinned});});await refresh();showCapture(id);});box.append(pin);
   if(['failed','interrupted','cancelled','partial'].includes(c.state))box.append(button('Повторить новой фиксацией',async()=>{await refreshSource();if(tab?.url!==c.source.final_url)throw new Error('Откройте исходный URL и нажмите значок TraceVault перед повтором');await runCapture(c.kind==='webpage'?'page':c.kind==='screenshot'?'screen':'image',{id:uuid(),tabId:tab.id,caseId:c.case_id,sourceUrl:c.source.final_url,imageUrl:c.image_source_url});}));
   if(c.warnings.length){box.append(el('h2','Диагностика неполноты'));const pre=el('pre',JSON.stringify(c.warnings,null,2));box.append(pre);}
   const refs=Object.values(state.refs).filter(r=>r.capture_id===id);if(refs.length)box.append(el('p',`Связанные ссылки на фрагменты: ${refs.length}`));
 }
 function showAnnotation(id) {
   const a=state.annotations[id];if(!a)return;const box=details('Аннотация',id);box.append(el('blockquote',a.selection?.exact || ''),el('p',a.note));const dl=el('dl');field(dl,'Создана',localTime(a.created_at));field(dl,'Изменена',localTime(a.updated_at));field(dl,'Восстановление',t(statuses[id] || a.reattachment_status));field(dl,'Метки',a.tags.join(', '));box.append(dl);referenceDetails(box,state.refs[a.reference_id]);
-  const row=el('div',undefined,'actions');row.append(button('Изменить',()=>editAnnotation(a)),button(a.hidden?'Показывать':'Скрыть',async()=>{await updateAnnotation(root,workspace,a.case_id,id,{hidden:!a.hidden});await refresh();await refreshSource();showAnnotation(id);}),button('К фрагменту',async()=>{await refreshSource();if(tab?.url!==a.source_url)throw new Error('Сначала откройте исходный URL');const result=await chrome.tabs.sendMessage(tab.id,{type:'TV_SCROLL',id});status(t(result.status));}),button('Удалить аннотацию',async()=>{await updateAnnotation(root,workspace,a.case_id,id,{deleted:true});await refresh();$('details').hidden=true;}));box.append(row);
+  const row=el('div',undefined,'actions');row.append(button('Изменить',()=>editAnnotation(a)),button(a.hidden?'Показывать':'Скрыть',async()=>{await updateAnnotation(root,workspace,a.case_id,id,{hidden:!a.hidden});await refresh();await refreshSource();showAnnotation(id);}),button('К фрагменту',async()=>{await refreshSource();if(tab?.url!==a.source_url)throw new Error('Сначала откройте исходный URL');const result=await chrome.tabs.sendMessage(tab.id,{type:'TV_SCROLL',id});status(t(result.status));}),button('Удалить аннотацию',async()=>{const c={...context(),caseId:a.case_id};await updateAnnotation(c.root,c.workspace,c.caseId,id,{deleted:true});lastDeleted={...c,id};$('undo-delete').hidden=false;await refresh();$('details').hidden=true;status('Аннотация скрыта из списка. Её можно вернуть.');}));box.append(row);
 }
 function editAnnotation(a) {
-  pending={...context(),editId:a.annotation_id,selection:a.selection,action:'edit',tabId:null};$('annotation-title').textContent='Изменить аннотацию';$('quote-preview').textContent=a.selection?.exact || 'Без цитаты';$('reference-state').textContent='Ссылка на первоисточник остаётся прежней';$('archive-first').hidden=true;$('annotation-note').value=a.note;$('annotation-color').value=a.appearance.color_token;$('annotation-tags').value=a.tags.join(', ');$('entity-fields').hidden=true;$('annotation-dialog').showModal();
+  pending={...context(),caseId:a.case_id,editId:a.annotation_id,selection:a.selection,action:'edit',tabId:null};$('annotation-title').textContent='Изменить аннотацию';$('quote-preview').textContent=a.selection?.exact || 'Без цитаты';$('reference-state').textContent='Ссылка на первоисточник остаётся прежней';$('archive-first').hidden=true;$('annotation-note').value=a.note;$('annotation-color').value=a.appearance.color_token;$('annotation-tags').value=a.tags.join(', ');$('entity-fields').hidden=true;$('annotation-dialog').showModal();
 }
 function showEntity(id) {
   const e=state.entities[id];if(!e)return;const box=details(e.label,id),dl=el('dl');field(dl,'Entity ID',e.entity_id);field(dl,'Тип',e.entity_type);field(dl,'Исходная строка',e.raw_value);field(dl,'Нормализованное значение',e.normalized_value);field(dl,'Проверка','Не подтверждено; confidence не оценено');field(dl,'Создана',localTime(e.created_at));box.append(dl);
@@ -193,23 +198,24 @@ function showEntity(id) {
 }
 function showAudit(event) {details('Событие журнала',event.event_id).append(el('pre',JSON.stringify(event,null,2)));}
 async function openArtifact(artifact) {
-  const file=await readFile(root,artifact.relative_path);if(viewerUrl)URL.revokeObjectURL(viewerUrl);
+  const file=await readVerifiedFile(root,artifact);if(viewerUrl)URL.revokeObjectURL(viewerUrl);
   viewerUrl=URL.createObjectURL(new Blob([await file.arrayBuffer()],{type:artifact.mime_type}));$('viewer-content').replaceChildren();
   const node=document.createElement(artifact.mime_type==='text/html'?'iframe':'img');
   if(node.tagName==='IFRAME'){node.setAttribute('sandbox','');node.setAttribute('referrerpolicy','no-referrer');node.title='Изолированный просмотр сохранённого HTML';}else node.alt='Оригинальное изображение';
   node.src=viewerUrl;$('viewer-content').append(node);$('viewer').showModal();
 }
 async function exportOriginal(artifact,caseId) {
-  const file=await readFile(root,artifact.relative_path),path=casePath(workspace,caseId)+`exports/${uuid()}__${artifact.relative_path.split('/').at(-1)}`;
+  const file=await readVerifiedFile(root,artifact),path=casePath(workspace,caseId)+`exports/${uuid()}__${artifact.relative_path.split('/').at(-1)}`;
   await exclusive(async()=>{await writeNew(root,path,file,artifact.mime_type);await append(root,workspace,caseId,'original_exported',null,null,{source:artifact.relative_path,relative_path:path});});status('Копия оригинала записана: '+path);
 }
 async function processInbox() {
   if(!activeCase || busy || $('annotation-dialog').open)return;
-  const drained=await navigator.locks.request('tracevault-inbox',{ifAvailable:true},async lock=>{
+  const drained=await navigator.locks.request('tracevault-inbox:'+workspace.workspace_id,{ifAvailable:true},async lock=>{
     if(!lock)return;
     const values=await chrome.storage.local.get(null),commands=Object.entries(values).filter(([key])=>key.startsWith('command:')).sort((a,b)=>a[1].created_at.localeCompare(b[1].created_at));
     for(const [key,command] of commands) {
       if($('annotation-dialog').open || busy)break;
+      if(command.workspaceId && command.workspaceId!==workspace.workspace_id)continue;
       const receiptCase=command.caseId || activeCase;
       if(!cases.some(c=>c.case_id===receiptCase)){status('Команда относится к другой рабочей папке. Повторите действие в нужном деле.',true);await chrome.storage.local.remove(key);continue;}
       // A durable receipt prevents reprocessing a selection command after a crash.
@@ -225,14 +231,14 @@ async function processInbox() {
     }
     return true;
   });
-  if(drained && !busy && !$('annotation-dialog').open){const values=await chrome.storage.local.get(null);if(Object.keys(values).some(k=>k.startsWith('command:')))queueMicrotask(()=>processInbox().catch(e=>status(errorText(e),true)));}
+  if(drained && !busy && !$('annotation-dialog').open){const values=await chrome.storage.local.get(null);if(Object.entries(values).some(([k,c])=>k.startsWith('command:') && (!c.workspaceId || c.workspaceId===workspace.workspace_id)))queueMicrotask(()=>processInbox().catch(e=>status(errorText(e),true)));}
 }
 action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle,$('workspace-mode').value);status('Доступ проверен записью и чтением тестового файла');});
 action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle);status('Рабочая папка подключена');});
 action('reauthorize',async()=>{if(await root.requestPermission({mode:'readwrite'})!=='granted')throw new Error('Доступ не предоставлен');await exclusive(()=>probe(root));await connect(root);status('Доступ к папке восстановлен и проверен');});
 action('new-case',()=>{if(!root)throw new Error('Сначала выберите папку');$('case-dialog').showModal();});
 $('case-form').addEventListener('submit',event=>{event.preventDefault();(async()=>{const c=await exclusive(()=>createCase(root,workspace,$('case-title').value,$('case-code').value));cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status('Дело создано');await processInbox();})().catch(e=>status(errorText(e),true));});
-$('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setting('activeCase',activeCase);await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
+$('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
 action('grant-site',async()=>{
   if(!/^https?:/u.test(tab?.url || ''))throw new Error('Нет доступного HTTP/HTTPS URL');
@@ -242,7 +248,7 @@ action('grant-site',async()=>{
 });
 action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('cancel',()=>controller?.abort());
 for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>beginAnnotation(name));action('manual-note',()=>beginAnnotation('manual'));
-action('archive-first',async()=>{if(!pending)return;const p=pending;const source=await chrome.tabs.get(p.tabId);if(source.url!==p.sourceUrl)throw new Error('URL изменился');const result=await runCapture('page',{tabId:p.tabId,id:uuid()});p.captureId=result.capture_id;$('reference-state').textContent=`Связь с ${result.evidence_number} · ${result.capture_id}`;});
+action('archive-first',async()=>{if(!pending)return;const p=pending;const source=await chrome.tabs.get(p.tabId);if(source.url!==p.sourceUrl)throw new Error('URL изменился');const result=await runCapture('page',{tabId:p.tabId,caseId:p.caseId,id:uuid()});if(!['completed','partial'].includes(result.state))throw new Error('Архив не подтверждён');p.captureId=result.capture_id;$('reference-state').textContent=`Связь с ${result.evidence_number} · ${result.capture_id}`;});
 $('annotation-form').addEventListener('submit',e=>saveDialog(e).catch(error=>status(errorText(error),true)));
 $('entity-type').replaceChildren(...ENTITY_TYPES.map(type=>Object.assign(el('option',type),{value:type})));$('entity-type').addEventListener('change',updateDuplicates);$('entity-label').addEventListener('input',updateDuplicates);
 document.querySelectorAll('[data-close-dialog]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
@@ -250,16 +256,69 @@ $('annotation-dialog').addEventListener('close',()=>processInbox().catch(e=>stat
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.view;page=0;document.querySelectorAll('[data-view]').forEach(n=>n.removeAttribute('aria-current'));b.setAttribute('aria-current','page');renderList();}));
 for(const id of ['search','type-filter','status-filter','domain-filter','date-filter'])$(id).addEventListener('input',()=>{page=0;renderList();});
 action('previous',()=>{page--;renderList();});action('next',()=>{page++;renderList();});action('close-details',()=>{$('details').hidden=true;selectedId=null;renderList();});
-action('close-viewer',()=>{$('viewer').close();$('viewer-content').replaceChildren();if(viewerUrl)URL.revokeObjectURL(viewerUrl);viewerUrl=null;});
+action('close-viewer',()=>{$('viewer').close();});
+$('viewer').addEventListener('close',()=>{$('viewer-content').replaceChildren();if(viewerUrl)URL.revokeObjectURL(viewerUrl);viewerUrl=null;});
 action('export-case',async()=>{await canWrite();const path=await exportCase(root,workspace,cases.find(c=>c.case_id===activeCase));status('Экспорт записан в выбранную папку: '+path);await refresh();});
 action('workspace',()=>chrome.tabs.create({url:chrome.runtime.getURL('panel.html?workspace=1')}));
 action('settings-toggle',()=>{$('settings').hidden=!$('settings').hidden;$('settings-toggle').setAttribute('aria-expanded',String(!$('settings').hidden));});
 action('shortcuts',()=>chrome.tabs.create({url:'chrome://extensions/shortcuts'}));
 $('theme').addEventListener('change',()=>{document.documentElement.dataset.theme=$('theme').value;});
-action('save-settings',async()=>{const mb=Number($('max-size').value);if(mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024,blockedDomains:$('blocked-domains').value.split('\n').map(s=>s.trim().toLowerCase()).filter(Boolean)};await setting('preferences',preferences);status('Настройки сохранены');});
+action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error('Лимит: от 1 до 256 МБ');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,maxBytes:mb*1024*1024,blockedDomains:$('blocked-domains').value.split('\n').map(s=>s.trim().toLowerCase()).filter(Boolean)};await setting('preferences',preferences);status('Настройки сохранены');});
 $('annotations-toggle').addEventListener('change',()=>{(async()=>{preferences.annotations=$('annotations-toggle').checked;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
-chrome.storage.onChanged.addListener(changes=>{if(Object.keys(changes).some(k=>k.startsWith('command:')))processInbox().catch(e=>status(errorText(e),true));});
+action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status('Аннотация восстановлена в исходном деле');});
+action('reset-filters',()=>{for(const id of ['search','type-filter','status-filter','domain-filter','date-filter'])$(id).value='';$('current-page-only').checked=false;page=0;renderList();});
+$('current-page-only').addEventListener('change',()=>{page=0;renderList();});
+const commandActions=[
+  {id:'capture-page',label:'Сохранить страницу как HTML'},
+  {id:'capture-screen',label:'Скриншот видимой области PNG'},
+  {id:'selection-highlight',label:'Подсветить выделенную цитату'},
+  {id:'selection-entity',label:'Создать Entity из выделения'},
+  {id:'note',label:'Создать свободную заметку',run:()=>beginAnnotation('manual')},
+  {id:'search',label:'Найти материалы',run:()=>{$('search').focus();$('search').select();}},
+  {id:'current-page',label:'Материалы только текущей страницы',run:()=>{$('current-page-only').checked=true;page=0;renderList();}},
+  {id:'reset-filters',label:'Сбросить все фильтры'},
+  {id:'export-case',label:'Экспортировать дело в JSON'},
+  {id:'annotations',label:'Показать или скрыть аннотации',run:()=>{$('annotations-toggle').click();}},
+  {id:'settings-toggle',label:'Открыть настройки'},
+  {id:'shortcuts',label:'Настроить горячие клавиши Chrome'}
+];
+function renderCommands(){
+  const query=$('command-search').value.toLocaleLowerCase('ru');
+  const items=commandActions.filter(c=>c.label.toLocaleLowerCase('ru').includes(query));
+  $('command-results').replaceChildren(...items.map(command=>{const b=button(command.label,async()=>{$('command-dialog').close();if(command.run)await command.run();else $(command.id).click();});b.dataset.command=command.id;b.disabled=!!$(command.id)?.disabled || (command.id==='note' && busy);return b;}));
+  if(!items.length)$('command-results').append(el('p','Нет подходящих команд','muted'));
+}
+function openCommands(){if(document.querySelector('dialog[open]'))return;renderCommands();$('command-dialog').showModal();$('command-search').focus();$('command-search').select();}
+action('command-menu',openCommands);$('command-search').addEventListener('input',renderCommands);
+$('command-dialog').addEventListener('keydown',e=>{
+  const buttons=[...$('command-results').querySelectorAll('button:not(:disabled)')],index=buttons.indexOf(document.activeElement);
+  if(['ArrowDown','ArrowUp'].includes(e.key) && buttons.length){e.preventDefault();buttons[index<0?(e.key==='ArrowDown'?0:buttons.length-1):(index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length].focus();}
+  if(e.key==='Enter' && document.activeElement===$('command-search') && buttons.length){e.preventDefault();buttons[0].click();}
+});
+document.addEventListener('keydown',e=>{
+  if(e.isComposing)return;
+  if(e.ctrlKey && e.shiftKey && e.code==='Space' && !e.altKey && !e.metaKey){e.preventDefault();openCommands();return;}
+  if(e.ctrlKey && e.key==='Enter' && $('annotation-dialog').open){e.preventDefault();$('annotation-form').requestSubmit();return;}
+  if(e.key==='/' && !e.ctrlKey && !e.altKey && !e.metaKey && !document.querySelector('dialog[open]') && !e.target.closest('input,textarea,select,[contenteditable]')){e.preventDefault();$('search').focus();return;}
+  if(e.key==='Escape' && busy && !document.querySelector('dialog[open]'))controller?.abort();
+});
+async function refreshShortcuts(){
+  const commands=await chrome.commands.getAll();
+  $('shortcut-list').replaceChildren(...commands.map(c=>{const line=el('p',undefined,'shortcut-line');line.append(el('span',c.description || c.name),el('kbd',c.shortcut || 'Не назначено'));return line;}));
+  const labels={'capture-page':'capture-page','capture-screen':'capture-screen','add-highlight':'selection-highlight'};
+  for(const c of commands)if(labels[c.name])$(labels[c.name]).title=c.shortcut?`${c.description} · ${c.shortcut}`:'Сочетание не назначено. Настройки → Горячие клавиши Chrome.';
+}
+action('refresh-shortcuts',refreshShortcuts);
+window.addEventListener('focus',()=>refreshShortcuts().catch(()=>{}));
+chrome.storage.onChanged.addListener(changes=>{
+  if(Object.keys(changes).some(k=>k.startsWith('command:')))processInbox().catch(e=>status(errorText(e),true));
+  const next=changes.activeContext?.newValue;
+  if(next && next.owner!==sessionId && next.workspaceId===workspace?.workspace_id && next.caseId!==activeCase){
+    const revision=++syncRevision;activeCase=next.caseId;page=0;$('details').hidden=true;
+    (async()=>{const found=await exclusive(()=>listCases(root,workspace));if(revision!==syncRevision)return;cases=found;await setCases(false);await refresh();await refreshSource();if(pending)status('Дело изменено в другом окне. Открытый редактор сохранит исходное дело.');})().catch(e=>status(errorText(e),true));
+  }
+});
 chrome.tabs.onActivated.addListener(()=>refreshSource().catch(()=>{}));
 chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.status==='complete')refreshSource().catch(()=>{});});
 async function init() {
@@ -271,6 +330,6 @@ async function init() {
     if(await root.queryPermission({mode:'readwrite'})==='granted')await connect(root);
     else {workspace=await readJSON(root,'workspace.json').catch(()=>null);await renderFolder();status('Требуется повторный доступ к папке',true);}
   } else status('Выберите папку, затем создайте дело');
-  await refreshSource();await processInbox();
+  await refreshShortcuts();await refreshSource();await processInbox();
 }
 init().catch(e=>status(errorText(e),true));

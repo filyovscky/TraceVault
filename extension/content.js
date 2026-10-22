@@ -16,9 +16,18 @@
     if(s?.anchorNode?.parentElement?.closest('input,textarea,[contenteditable]')) return null;
     if(!s?.rangeCount || s.isCollapsed || s.anchorNode?.parentElement?.closest('[data-tracevault-ui]')) return lastSelection && locate(model(),lastSelection).status==='attached' ? lastSelection : null;
     const range=s.getRangeAt(0), m=model();
-    const a=m.nodes.find(x=>x.node===range.startContainer),b=m.nodes.find(x=>x.node===range.endContainer);
-    if(!a || !b) return null;
-    const start=a.start+range.startOffset,end=b.start+range.endOffset,exact=m.text.slice(start,end);
+    function boundary(container,offset) {
+      const text=m.nodes.find(x=>x.node===container);
+      if(text)return text.start+offset;
+      if(container.nodeType!==Node.ELEMENT_NODE)return null;
+      // Select-all and whole-paragraph ranges can have ELEMENT boundaries.
+      // Map those DOM positions onto the same filtered UTF-16 text model.
+      const point=document.createRange();point.setStart(container,offset);point.collapse(true);
+      return m.nodes.find(x=>point.comparePoint(x.node,0)>=0)?.start ?? m.text.length;
+    }
+    const start=boundary(range.startContainer,range.startOffset),end=boundary(range.endContainer,range.endOffset);
+    if(start===null || end===null || end<start)return null;
+    const exact=m.text.slice(start,end);
     if(!exact.trim() || exact.length>100_000) return null;
     lastSelection={exact,prefix:m.text.slice(Math.max(0,start-48),start),suffix:m.text.slice(end,end+48),start_offset:start,end_offset:end,dom_hint:range.startContainer.parentElement.tagName.toLowerCase(),normalization:'textContent UTF-16 v1',anchor_version:1};
     return lastSelection;
@@ -37,7 +46,9 @@
   }
   function clear() {if(globalThis.CSS?.highlights) for(const color of Object.keys(colorMap)) CSS.highlights.delete('tracevault-'+color);}
   function render() {
-    clear();const m=model(),groups={amber:[],green:[],violet:[]},statuses={};
+    clear();if(host)host.hidden=hidden || !enabled;
+    if(!annotations.length)return {};
+    const m=model(),groups={amber:[],green:[],violet:[]},statuses={};
     for(const a of annotations) {const result=locate(m,a.selection);statuses[a.annotation_id]=result.status;if(enabled && !hidden && !a.hidden && result.range) groups[a.appearance?.color_token || 'amber']?.push(result.range);}
     if(globalThis.CSS?.highlights && enabled && !hidden) for(const [color,ranges] of Object.entries(groups)) CSS.highlights.set('tracevault-'+color,new Highlight(...ranges));
     if(host) host.hidden=hidden || !enabled;

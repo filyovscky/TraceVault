@@ -10,9 +10,9 @@ chrome.runtime.onInstalled.addListener(async()=>{
 chrome.action.onClicked.addListener(tab=>{chrome.sidePanel.open({tabId:tab.id}).catch(console.error);});
 async function enqueue(action,tab,extra={}) {
   if(!tab?.id) return;
-  const {activeCase}=await chrome.storage.local.get('activeCase');
+  const {activeCase,activeContext}=await chrome.storage.local.get(['activeCase','activeContext']);
   const {selectionText,...details}=extra;
-  const command={id:crypto.randomUUID(),action,tabId:tab.id,caseId:activeCase || null,sourceUrl:tab.url,created_at:new Date().toISOString(),selectionDigest:selectionText?await sha256(new TextEncoder().encode(selectionText)):null,...details};
+  const command={id:crypto.randomUUID(),action,tabId:tab.id,caseId:activeCase || null,workspaceId:activeContext?.workspaceId || null,sourceUrl:tab.url,created_at:new Date().toISOString(),selectionDigest:selectionText?await sha256(new TextEncoder().encode(selectionText)):null,...details};
   await chrome.storage.local.set({['command:'+command.id]:command});
 }
 chrome.contextMenus.onClicked.addListener((info,tab)=>{

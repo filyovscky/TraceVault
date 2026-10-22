@@ -1,8 +1,26 @@
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();
 export const uuid = () => crypto.randomUUID();
+export function matchesDomain(url, filter) {
+  if(!filter.trim())return true;
+  try {
+    const input=filter.trim(),host=new URL(input.includes('://')?input:'https://'+input).hostname.toLowerCase().replace(/\.$/u,'');
+    const actual=new URL(url).hostname.toLowerCase().replace(/\.$/u,'');
+    return !!host && (actual===host || actual.endsWith('.'+host));
+  }catch{return false;}
+}
+export function recordUrls(record, refs={}) {
+  return [...new Set([record.source?.final_url,record.source_url,...(record.evidence_refs || []).map(id=>refs[id]?.source_url)].filter(Boolean))];
+}
+export function citation(capture, quote='') {
+  const rows=[capture.source.title,capture.source.final_url,`Фиксация (UTC): ${capture.times.capture_started_at}`,`Capture ID: ${capture.capture_id}`];
+  if(quote)rows.unshift(`«${quote}»`);
+  if(!capture.artifacts.length)rows.push('Подтверждённые файлы отсутствуют');
+  for(const artifact of capture.artifacts)rows.push(`Файл: ${artifact.relative_path}`,`SHA-256: ${artifact.sha256}`);
+  return rows.join('\n');
+}
 export function hostPattern(url) {const u=new URL(url);if(!/^https?:$/u.test(u.protocol))throw new Error('Неподдерживаемый протокол');return `${u.protocol}//${u.hostname}/*`;}
 export function clock() {
   return {timezone_id: Intl.DateTimeFormat().resolvedOptions().timeZone, local_offset_minutes: -new Date().getTimezoneOffset(), clock_source: 'system_clock'};

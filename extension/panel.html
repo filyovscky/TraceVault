@@ -2,7 +2,7 @@
 <html lang="ru">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TraceVault</title><link rel="stylesheet" href="panel.css"></head>
 <body>
-  <header><strong>TraceVault</strong><div class="header-actions"><button id="workspace" title="Открыть полную рабочую область">Рабочая область</button><button id="settings-toggle" aria-expanded="false" aria-controls="settings">Настройки</button></div></header>
+  <header><strong>TraceVault</strong><div class="header-actions"><button id="command-menu" title="Команды · Ctrl+Shift+Space">Команды</button><button id="workspace" title="Открыть полную рабочую область">Рабочая область</button><button id="settings-toggle" aria-expanded="false" aria-controls="settings">Настройки</button></div></header>
   <main>
     <section id="setup" aria-labelledby="setup-title">
       <h1 id="setup-title">Рабочая папка</h1><p>Оригиналы, метаданные и журнал сохраняются в выбранной папке. Для переноса скопируйте её целиком.</p>
@@ -30,18 +30,21 @@
       <label>Исключённые домены (по одному в строке)<textarea id="blocked-domains" rows="3" placeholder="bank.example"></textarea></label>
       <label>Предел захвата, МБ<input id="max-size" type="number" min="1" max="256" value="64"></label>
       <button id="save-settings">Сохранить настройки</button><button id="shortcuts">Горячие клавиши Chrome</button>
+      <div id="shortcut-list" aria-live="polite"></div><button id="refresh-shortcuts">Проверить назначения</button>
       <p class="muted">Данные: выбранная папка. В браузере: доступ к папке, настройки, кеш аннотаций, очередь явных команд. Серверов и телеметрии нет. Для восстановления после очистки браузера снова выберите папку. Вводимые поля при архивировании очищаются. Системные часы не являются независимым подтверждением времени.</p>
     </section>
     <section id="collection" aria-labelledby="collection-title">
       <div class="row"><h2 id="collection-title">Дело</h2><button id="manual-note" hidden>Свободная заметка</button><button id="export-case">Экспорт JSON</button></div>
       <nav aria-label="Разделы дела"><button data-view="captures" aria-current="page">Материалы</button><button data-view="annotations">Аннотации</button><button data-view="entities">Сущности</button><button data-view="audit">История</button></nav>
       <label class="search-label">Поиск<input id="search" type="search" placeholder="Название, URL, цитата, метка, номер…"></label>
+      <div class="row"><label class="check"><input id="current-page-only" type="checkbox"> Только текущая страница</label><button id="reset-filters">Сбросить фильтры</button></div>
       <details id="filter-options"><summary>Фильтры</summary><div class="filters"><label>Тип<select id="type-filter"><option value="">Все</option><option value="webpage">HTML</option><option value="screenshot">PNG</option><option value="image">Изображение</option></select></label><label>Статус<select id="status-filter"><option value="">Все</option><option value="completed">Сохранено</option><option value="partial">Частично</option><option value="failed">Ошибка</option><option value="interrupted">Прервано</option></select></label><label>Домен<input id="domain-filter" placeholder="example.org"></label><label>С даты<input id="date-filter" type="date"></label></div></details>
       <div id="list" role="list"></div><div class="row pagination"><button id="previous">Предыдущие</button><span id="page-number" class="muted"></span><button id="next">Следующие</button></div>
     </section>
     <section id="details" hidden aria-labelledby="details-title"><div class="row"><h2 id="details-title">Карточка</h2><button id="close-details">Закрыть карточку</button></div><div id="details-body"></div></section>
   </main>
-  <footer><output id="status" role="status" aria-live="polite">Инициализация…</output></footer>
+  <footer><output id="status" role="status" aria-live="polite">Инициализация…</output><button id="undo-delete" hidden>Вернуть аннотацию</button></footer>
+  <dialog id="command-dialog" aria-labelledby="command-title"><div class="row"><h2 id="command-title">Команды TraceVault</h2><button type="button" data-close-dialog>Закрыть</button></div><label>Найти действие<input id="command-search" type="search" autocomplete="off" placeholder="Страница, заметка, поиск…" aria-controls="command-results"></label><div id="command-results"></div><p class="muted">↑ ↓ — выбрать · Enter — выполнить · Esc — закрыть. / — поиск материалов вне полей ввода. Ctrl+Enter — сохранить открытый редактор.</p></dialog>
   <dialog id="case-dialog"><form id="case-form"><h2>Новое дело</h2><label>Код<input id="case-code" required maxlength="40" placeholder="INV-2026-001"></label><label>Название<input id="case-title" required maxlength="200"></label><div class="actions"><button class="primary" type="submit">Создать дело</button><button type="button" data-close-dialog>Отмена</button></div></form></dialog>
   <dialog id="annotation-dialog"><form id="annotation-form"><h2 id="annotation-title">Сохранить фрагмент</h2><blockquote id="quote-preview"></blockquote><p id="reference-state" class="muted"></p><button type="button" id="archive-first">Сначала сохранить страницу и привязать цитату</button><label>Комментарий<textarea id="annotation-note" rows="4"></textarea></label><label>Цвет<select id="annotation-color"><option value="amber">Янтарный</option><option value="green">Зелёный</option><option value="violet">Фиолетовый</option></select></label><label>Метки (через запятую)<input id="annotation-tags"></label><div id="entity-fields" hidden><label>Тип Entity<select id="entity-type"></select></label><label>Название / значение<input id="entity-label" maxlength="1000"></label><div id="duplicate-info" class="muted"></div><label>Действие<select id="entity-existing"><option value="">Создать новую (неразрешённую)</option></select></label></div><div class="actions"><button type="submit" class="primary">Сохранить в дело</button><button type="button" data-close-dialog>Отмена</button></div></form></dialog>
   <dialog id="viewer"><div class="row"><h2>Сохранённый оригинал</h2><button id="close-viewer">Закрыть просмотр</button></div><div id="viewer-content"></div></dialog>

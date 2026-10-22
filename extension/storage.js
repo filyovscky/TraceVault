@@ -25,6 +25,12 @@ export async function fileHandle(root, path, create = false) {
   return (await directory(root,parts,create)).getFileHandle(name,{create});
 }
 export async function readFile(root,path) { return (await fileHandle(root,path)).getFile(); }
+export async function readVerifiedFile(root,artifact) {
+  const file=await readFile(root,artifact.relative_path),bytes=await file.arrayBuffer();
+  if(file.size!==artifact.byte_length || await sha256(bytes)!==artifact.sha256)throw new Error('Контрольная сумма не совпадает: файл изменён. Просмотр и экспорт оригинала остановлены. '+artifact.relative_path);
+  // Return an immutable snapshot: the file may change on disk after this check.
+  return new Blob([bytes],{type:artifact.mime_type});
+}
 export async function readJSON(root,path) { return JSON.parse(await (await readFile(root,path)).text()); }
 export async function exists(root,path) {
   try { await readFile(root,path); return true; } catch(e) { if (e.name === 'NotFoundError') return false; throw e; }

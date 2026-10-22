@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern} from '../extension/domain.js';
+import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern,matchesDomain,recordUrls,citation} from '../extension/domain.js';
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
 test('portable paths reject traversal and Windows reserved characters',()=>{for(const bad of ['../a','/a','a\\b','C:/a','a//b','a/../x','a.','a/'])assert.throws(()=>safePath(bad));assert.deepEqual(safePath('cases/abc/captures/1.html'),['cases','abc','captures','1.html']);});
 test('conservative normalization preserves email local part and phone context',()=>{assert.equal(normalize('email','User.Name@EXAMPLE.COM'),'User.Name@example.com');assert.equal(normalize('phone','8 (900) 123-45-67'),'8 (900) 123-45-67');assert.equal(normalize('domain','ПРИМЕР.РФ'),'xn--e1afmkfd.xn--p1ai');assert.equal(normalize('person','Иван Иванов'),'Иван Иванов');});
@@ -10,3 +10,10 @@ test('export shares captures and keeps all separate evidence references',()=>{co
 test('closed pages, incognito, pause and excluded subdomains are rejected',()=>{for(const tab of [{url:'chrome://settings'},{url:'https://x',incognito:true}])assert.throws(()=>assertWebTab(tab));assert.throws(()=>assertWebTab({url:'https://x'},{paused:true}));assert.throws(()=>assertWebTab({url:'https://a.bank.test'},{blockedDomains:['bank.test']}));});
 test('display time includes milliseconds and explicit UTC offset',()=>assert.match(localTime('2026-10-22T11:42:17.384Z'),/\.384 \(UTC[+-]\d{2}:\d{2}\)/u));
 test('host permissions do not include unsupported port components',()=>assert.equal(hostPattern('http://localhost:8123/test'),'http://localhost/*'));
+test('domain filter matches hosts, subdomains and IDNA; never query strings or suffix lookalikes',()=>{
+  assert.equal(matchesDomain('https://a.example.org/x','example.org'),true);assert.equal(matchesDomain('https://example.org.evil.test/','example.org'),false);assert.equal(matchesDomain('https://evil.test/?url=example.org','example.org'),false);assert.equal(matchesDomain('https://xn--e1afmkfd.xn--p1ai/x','пример.рф'),true);assert.equal(matchesDomain('https://example.org/','https://example.org/path'),true);
+});
+test('entity filters resolve source URLs through immutable reference IDs',()=>assert.deepEqual(recordUrls({evidence_refs:['r','missing']},{r:{source_url:'https://example.org'}}),['https://example.org']));
+test('citation includes original full URL, UTC and complete checksums without inventing artifacts',()=>{
+  const record={source:{title:'Источник',final_url:'https://example.org/?token=important'},capture_id:'capture',times:{capture_started_at:'2026-10-22T11:42:17.384Z'},artifacts:[{relative_path:'captures/a.html',sha256:'a'.repeat(64)}]};const result=citation(record,'Точная цитата');assert.ok(result.includes(record.source.final_url));assert.ok(result.includes('a'.repeat(64)));assert.ok(result.includes('Точная цитата'));assert.ok(result.includes('.384Z'));assert.match(citation({...record,artifacts:[]}),/отсутствуют/u);
+});

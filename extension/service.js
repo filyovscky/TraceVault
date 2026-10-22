@@ -14,7 +14,7 @@ export async function registerAnnotationSites(origins) {
 export async function broadcastAnnotations(caseId,state,enabled,hiddenDomains=[]) {
   const values=await chrome.storage.local.get('annotationCache'),cache=values.annotationCache || {};
   cache[caseId]=Object.values(state.annotations).filter(a=>!a.deleted);
-  await chrome.storage.local.set({annotationCache:cache,activeCase:caseId,annotationsEnabled:enabled,hiddenAnnotationDomains:hiddenDomains});
+  await chrome.storage.local.set({annotationCache:cache,annotationsEnabled:enabled,hiddenAnnotationDomains:hiddenDomains});
   const tabs=await chrome.tabs.query({});
   await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:cache[caseId].filter(a=>a.source_url===tab.url),enabled:enabled && !hiddenDomains.some(host=>{try{return new URL(tab.url).hostname===host;}catch{return false;}})})));
 }
