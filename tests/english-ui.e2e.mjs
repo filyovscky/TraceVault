@@ -5,6 +5,26 @@ import path from 'node:path';
 import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 
+for(const installed of [false,true])test(`selection toolbar never reappears without a live selection${installed?' — installed Chrome':''}`,async()=>{
+  const run=Date.now(),context=await launch(path.resolve('output/playwright/toolbar-profile-'+run),{installed}),fixture=await fixtureServer();
+  try{
+    const panel=await extensionPage(context),source=await context.newPage();await source.goto(fixture.url+'/static');
+    const highlight=source.getByRole('button',{name:'Highlight',exact:true});
+    const select=()=>source.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('p'));getSelection().removeAllRanges();getSelection().addRange(range);document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0}));});
+    const render=(message={type:'TV_RENDER',annotations:[],enabled:true})=>panel.evaluate(async({url,message})=>{const [tab]=await chrome.tabs.query({url});return chrome.tabs.sendMessage(tab.id,message);},{url:source.url(),message});
+    await select();await expect(highlight).toBeVisible();
+    await source.mouse.click(600,600);await expect(highlight).not.toBeVisible();
+    await render();await expect(highlight).not.toBeVisible();
+    await source.evaluate(()=>document.body.append(document.createTextNode('Live streaming update')));await render();await expect(highlight).not.toBeVisible();
+    await select();await expect(highlight).toBeVisible();await source.keyboard.press('Escape');await render();await expect(highlight).not.toBeVisible();
+    await select();await expect(highlight).toBeVisible();await source.evaluate(()=>getSelection().removeAllRanges());await expect(highlight).not.toBeVisible();await render();await expect(highlight).not.toBeVisible();
+    await select();await expect(highlight).toBeVisible();await render({type:'TV_HIDE',hidden:true});await expect(highlight).not.toBeVisible();await render({type:'TV_HIDE',hidden:false});await expect(highlight).not.toBeVisible();
+    await select();await expect(highlight).toBeVisible();await source.evaluate(()=>document.dispatchEvent(new Event('scroll')));await render();await expect(highlight).not.toBeVisible();
+    await select();await expect(highlight).toBeVisible();await source.setViewportSize({width:800,height:650});await render();await expect(highlight).not.toBeVisible();
+    await source.screenshot({path:path.resolve(`output/playwright/0.4.5-toolbar-cleared-${installed?'installed':'cft'}.png`)});
+  }finally{await context.close();fixture.server.close();}
+});
+
 test('English icon UI: hover/focus, grouped settings, real save, annotation and preference persistence',async()=>{
   test.setTimeout(120000);const run=Date.now(),directory=path.resolve('output/playwright/english-workspace-'+run),context=await launch(path.resolve('output/playwright/english-profile-'+run)),fixture=await fixtureServer();
   try{

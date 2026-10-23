@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5 — selection toolbar dismissal, 23.10.2026
+
+- Annotation rendering no longer opens the floating selection toolbar. Previously background refreshes, page mutations and capture cleanup could make an already-dismissed toolbar visible with no selection.
+- Toolbar eligibility uses a live, nonempty, connected page selection outside editors and TraceVault UI, with a visible rectangle. Clearing selection, outside clicks, Escape, scroll, resize, blur, capture-hide and native context menus dismiss the toolbar and cancel queued opening callbacks.
+- Cached selection remains available for side-panel actions after focus changes; explicit empty page clicks clear the cache. Original page text and archived evidence are unchanged.
+
 ## 0.4.4 — all-site access by default, 22.10.2026
 
 - Required `<all_urls>` host access replaces optional per-domain access. HTML/PNG/PDF and selection actions no longer call permissions.request. Chrome may require approval on update; user-imposed site restrictions remain under Chrome's control.

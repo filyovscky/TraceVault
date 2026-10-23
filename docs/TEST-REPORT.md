@@ -1,5 +1,13 @@
 # Фактические проверки
 
+## 0.4.5 — floating toolbar shown without a selection
+
+- Reproduced before fixing: select a paragraph → click empty page space → toolbar hides → send the ordinary TV_RENDER annotation refresh → toolbar incorrectly becomes visible again. The new regression failed at exactly that last assertion against 0.4.4. The same unconditional visibility assignment was also reached by streaming DOM mutations and TV_HIDE cleanup.
+- Removed both unconditional show assignments from annotation rendering. Only a primary pointer-up with a valid live range can show the toolbar. Range eligibility checks nonempty text, connected body endpoints, editor/UI exclusion and visible geometry. Dedicated dismissal cancels pending opening callbacks for outside pointer-down, lost selection, Escape, scroll, resize, blur, document hiding and native context menus. Cached annotation selection is separate; focus changes do not discard the source selection needed by panel actions.
+- `npm run check`: ESLint/build and **16/16 unit tests PASS**. Final targeted browser run **5/5 PASS**: the new toolbar regression in CFT and installed Chrome, existing English UI/settings/real note/filter regression, context highlight/edit/delete/Undo in both browsers. No skipped tests or retries in this final run; the initial reproduction failure is intentional and recorded above.
+- New regression covers empty click plus TV_RENDER, a streaming-style DOM append plus refresh, Escape plus refresh with a native selection still present, programmatic selection removal, TV_HIDE true/false, scroll, resize, and successful reopening on a fresh selection. Existing context regressions verify actual disk journals and original HTML byte/hash preservation. CFT context/Undo passed in this run, without a separate timing fix or a claim that earlier timing instability is universally resolved.
+- Visual inspection: actual cleared-toolbar screenshots in CFT and installed Chrome. `qa/0.4.5-toolbar-dismissed.png` shows the toolbar remains dismissed after resize even though the browser's native blue selection remains available. The user's ChatGPT session was not opened; streaming mutations were reproduced on the controlled fixture. All-site permissions and directory access behavior are unchanged.
+
 ## 0.4.4 — default all-site access
 
 - User explicitly requested all-site access by default. Required `<all_urls>` replaces optional host permissions; no production permissions.request calls remain. This pattern is needed for captureVisibleTab without activeTab invocation. Annotation restoration is declared statically for top-level HTTP/HTTPS documents; non-HTML documents return safely. The update handler removes the old dynamic registration. No storage format or dependency changes.
