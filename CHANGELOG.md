@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.7 — optional case code, 27.10.2026
+
+- Case code is optional and blank by default. Empty/whitespace/omitted codes are assigned in the repository when the case is created: first unused CASE-001, CASE-002, etc. Existing codes are read from disk under the caller's write lock.
+- User-supplied codes retain their value (with surrounding whitespace trimmed). Existing case files are not renamed or rewritten. The form explicitly says that leaving the code blank assigns one automatically.
+
 ## 0.4.6 — guarded workspace setup, 27.10.2026
 
 - Fix null-workspace case operations: a remembered folder handle no longer enables case creation before workspace metadata is connected. Repository path/list/create operations validate the workspace mode before any disk access. Invalid/null workspace.json reports a recovery message instead of a property-access exception.

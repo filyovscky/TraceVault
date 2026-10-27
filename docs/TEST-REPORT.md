@@ -1,5 +1,12 @@
 # Фактические проверки
 
+## 0.4.7 — assign codes for empty input
+
+- Removed the required constraint and prefilled value from Case code. Repository createCase accepts an omitted code, trims input, and assigns the first unused CASE-NNN from the actual case list when blank. Manual codes are retained. UI case creation continues to execute under the disk writer lock; the assignment happens before verified writes.
+- `npm run check`: ESLint, **17/17 unit tests**, build PASS. `git diff --check` PASS.
+- **3/3 browser scenarios PASS**: guided creation in CFT and installed Chrome, plus single-case mode. Both guided scenarios submit an untouched empty code and duplicate form submit → exactly one CASE-001; submit whitespace → CASE-002; submit INV-CUSTOM → that exact code. Node independently reads all three case.json files and checks their stored code values. The scenarios also retain original-artifact bytes/SHA-256 checks and recovery coverage. Single-case mode still refuses a second case.
+- Visually inspected the actual 360px case dialog: optional label, Automatic placeholder and explanatory text. Screenshot: qa/0.4.7-optional-code.png. No schema, dependency or permission changes; existing case codes/files are unchanged. Manually duplicated nonempty codes retain the previous behavior; uniqueness is enforced for generated choices within the workspace under the caller's existing write lock.
+
 ## 0.4.6 — null mode and case initialization UX
 
 - Root cause reproduced by state: init can restore a directory handle while workspace metadata remains null after denied access. The old New case action checked only the handle, then createCase dereferenced workspace.mode. New repository preconditions reject null/undefined/invalid modes before disk access; a unit test uses a throwing root proxy to verify this boundary. Null workspace.json is separately rejected with an actionable message.

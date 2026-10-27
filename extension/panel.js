@@ -45,8 +45,7 @@ function openCaseDialog(){
   if(!root || !workspace)throw new Error('Connect a workspace folder before creating a case.');
   if(folderPermission!=='granted')throw new Error('Restore folder access before creating a case.');
   if(workspace.mode==='single_case' && cases.length)throw new Error('This folder supports only one case');
-  let number=cases.length+1;while(cases.some(c=>c.code==='CASE-'+String(number).padStart(3,'0')))number++;
-  $('case-title').value='';$('case-code').value='CASE-'+String(number).padStart(3,'0');
+  $('case-title').value='';$('case-code').value='';
   $('case-target').textContent=`Save in: ${root.name}`;$('case-save-state').textContent='Materials and notes will be grouped in this case.';
   $('case-dialog').showModal();$('case-title').focus();
 }

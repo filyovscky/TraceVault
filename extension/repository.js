@@ -18,11 +18,14 @@ export async function listCases(root, workspace) {
   } catch(e) { if (e.name !== 'NotFoundError') throw e; }
   return result;
 }
-export async function createCase(root, workspace, title, code) {
+export async function createCase(root, workspace, title, code='') {
   const mode=workspaceMode(workspace);
-  if (!title.trim() || !code.trim()) throw new Error("Enter a case title and code");
-  if (mode === 'single_case' && (await listCases(root,workspace)).length) throw new Error("This folder supports only one case");
-  const c = {schema_version:1,case_id:uuid(),title:title.trim(),code:code.trim(),created_at:now()};
+  if (!title.trim()) throw new Error("Enter a case title");
+  let assignedCode=(code ?? '').trim();
+  const existing=mode==='single_case' || !assignedCode?await listCases(root,workspace):[];
+  if (mode === 'single_case' && existing.length) throw new Error("This folder supports only one case");
+  if(!assignedCode){const used=new Set(existing.map(c=>c.code));let number=1;while(used.has('CASE-'+String(number).padStart(3,'0')))number++;assignedCode='CASE-'+String(number).padStart(3,'0');}
+  const c = {schema_version:1,case_id:uuid(),title:title.trim(),code:assignedCode,created_at:now()};
   await writeNew(root,casePath(workspace,c.case_id)+'case.json',c);
   await append(root,workspace,c.case_id,'case_created',null,c);
   return c;
