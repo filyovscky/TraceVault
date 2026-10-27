@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.5 — separate development integrations, 27.10.2026
+
+- Remove external-integration claims from current documentation, comparison and entity details. Describe case JSON export as TraceVault's own interchange format.
+- Move the adapter prototype, contract notes and service tests into development; keep historical results and the unmodified original specification clearly separated from released capabilities.
+- New case export filenames use __tracevault-export.json. Existing JSON format/schema identifiers and previously saved files remain unchanged.
+
 ## 0.5.4 — recover interrupted session writes, 27.10.2026
 
 - Fix false "different bytes" failures: chrome.storage.local can reorder keys in object values. Pending events are now frozen as validated JSON text before persistence/writing; legacy object drafts migrate on retry.
@@ -33,7 +39,7 @@
 
 - Explicit Start/Stop in the side panel, pinned to one normal window and the starting case. Record top-level HTTP(S) navigation, SPA/hash changes, titles, tab membership and browser-provided linked-tab relationships. Other windows and incognito are excluded; moved tabs are checked before queueing and before writing.
 - Background FSA writes continue after closing the panel. Separate immutable JSON event files with readback SHA-256, ordinary case audit references, pending/error/retry states, idempotent retry and explicit stop on window close or browser/extension restart. No automatic reassignment of window IDs.
-- Session journal, original metadata/checksum details and verified JSON export. Pausing capture stops the session. Source content is captured separately. No dependencies or OSINTchart schema changes; `webNavigation` is a new required permission.
+- Session journal, original metadata/checksum details and verified JSON export. Pausing capture stops the session. Source content is captured separately. No dependencies or data-schema changes; `webNavigation` is a new required permission.
 - Reuse the journal snapshot under the existing writer lock, and throttle list refresh during recording. A measured 100-event burst improved from 70.5 to 53.9 seconds and 35.0 to 19.5 whole-test-browser CPU seconds. Panel retained JS heap grew by about 0.4 MB; whole-browser memory is explicitly not extension-only memory. High-volume journal indexing remains a bottleneck.
 
 ## 0.4.8 — create a workspace subfolder, 27.10.2026
@@ -137,7 +143,7 @@
 - Собственный автономный HTML engine, PNG viewport, исходные изображения; readback SHA-256 и точные часы.
 - Append-only файловые события, восстановление interrupted, pinned case ID, отмена/лимиты/диагностика.
 - Аннотации через CSS Highlight, заметки, точные цитаты, консервативные якоря.
-- Entity drafts, immutable Evidence Reference, JSON export и отдельный OSINTchart CaseService adapter.
+- Entity drafts, immutable Evidence Reference, JSON export. Исторический прототип внешнего адаптера перенесён в раздел разработки.
 - Unit/E2E/схемы и фактический отчёт; P0 acceptance ещё уточняется, P1/P2 не объявлены завершёнными.
 - Проверен установленный Chrome 155 и CFT 156, native SIDE_PANEL, 32 корректных HiDPI PNG, 2000 synthetic metadata records.
 - Исправлены activeTab при открытии панели, stale annotation state, null injected-DOM result при лимите, race редактора/экспорта и обработка очереди после прерывания.

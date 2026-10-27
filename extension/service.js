@@ -164,7 +164,7 @@ export async function verifyArtifact(root,workspace,caseId,artifact) {
 }
 export async function exportCase(root,workspace,caseInfo) {
   return exclusive(async()=>{
-    const state=await loadState(root,workspace,caseInfo.case_id),data=makeExport(state,caseInfo),path=casePath(workspace,caseInfo.case_id)+`exports/${uuid()}__tracevault-osintchart-export.json`;
+    const state=await loadState(root,workspace,caseInfo.case_id),data=makeExport(state,caseInfo),path=casePath(workspace,caseInfo.case_id)+`exports/${uuid()}__tracevault-export.json`;
     await writeNew(root,path,data);await append(root,workspace,caseInfo.case_id,'case_exported',null,null,{relative_path:path});return path;
   });
 }

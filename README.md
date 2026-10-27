@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.5.4](releases/TraceVault-0.5.4.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.5.5](releases/TraceVault-0.5.5.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.4. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.5.4 add no permissions.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.5. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.5.5 add no permissions.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** before creating a case; existing files stay in the original folder.
 
@@ -77,11 +77,11 @@ The history icon filters **History** to the session; event details offer the URL
 
 This records a browsing trail, **not page contents**. Use HTML/PNG/PDF capture to preserve the page itself. It does not reconstruct pre-session history, every redirect hop, failed navigation or user input. System time is not an independent timestamp. Sudden process/disk failure may lose browser callbacks that have not reached persistent pending storage; it is not a lossless forensic network recorder. One active session is supported. See [architecture and limits](docs/SESSION-RECORDING.md), [measured performance](docs/PERFORMANCE.md) and [comparison with adjacent tools](docs/COMPARISON.md).
 
-## OSINTchart and build
+## Export and build
 
-Export writes a versioned interchange JSON to the case's exports folder. It is not an `.oscase` file. The [Python adapter](adapters/osintchart_import.py) targets the real OSINTchart CaseService/schema 2 and supports preview, explicit confirmation, repeat imports and conflict detection. It is not installed in the OSINTchart GUI and has no native/HTTP bridge.
+**Export case JSON** writes a versioned JSON file to the case's `exports` folder, with source metadata, entities, evidence references, annotations, artifact hashes and relative paths. Copy the complete case folder alongside the JSON to transfer its primary files. The export is TraceVault's own interchange format; compatibility with other applications requires a separate adapter.
 
-Requires Node.js 24; Python is used for ZIP packaging and adapter QA.
+Requires Node.js 24; Python is used for ZIP packaging.
 
 ```powershell
 npm ci
@@ -93,4 +93,4 @@ python scripts/package.py
 
 E2E uses isolated profiles and actual disk folders under `output/playwright`. Directory selection is automated with a native FSA handle supplied by CDP; only the QA profile pre-allows writes. Native OS picker/permission bubbles are not automated. The installed-Chrome tests use the standard Windows path; elsewhere add `--grep-invert "installed Chrome"`.
 
-SingleFile is not bundled. There are no runtime third-party dependencies. [Dependency licenses](docs/LICENSES.md), [architecture](docs/ARCHITECTURE.md), [acceptance limits](docs/P0-STATUS.md), [test results](docs/TEST-REPORT.md), [UI plan](docs/UI-0.4-PLAN.md), [screenshots](docs/qa/README.md). Earlier engineering logs and the original specification remain in Russian. P0 is a tested MVP candidate; OCR, diff, video, trusted timestamps, encryption and a native bridge are not implemented.
+SingleFile is not bundled. There are no runtime third-party dependencies. [Dependency licenses](docs/LICENSES.md), [architecture](docs/ARCHITECTURE.md), [acceptance limits](docs/P0-STATUS.md), [test results](docs/TEST-REPORT.md), [UI plan](docs/UI-0.4-PLAN.md), [screenshots](docs/qa/README.md). [Features in development](docs/development/README.md) are separate from released functionality. Earlier engineering logs and the archived original specification remain in Russian. P0 is a tested MVP candidate; OCR, diff, video, trusted timestamps, encryption and a native bridge are not implemented.

@@ -323,7 +323,7 @@ function editAnnotation(a) {
 function showEntity(id) {
   const e=state.entities[id];if(!e)return;const box=details(e.label,id),dl=el('dl');field(dl,'Entity ID',e.entity_id);field(dl,"Type",e.entity_type);field(dl,"Original value",e.raw_value);field(dl,"Normalized value",e.normalized_value);field(dl,"Verification","Unconfirmed; confidence not assessed");field(dl,"Created",localTime(e.created_at));box.append(dl);
   for(const ref of e.evidence_refs)referenceDetails(box,state.refs[ref]);
-  box.append(el('p',"Use Export case JSON to transfer data. Direct OSINTchart integration is not available in this version.",'muted'));
+  box.append(el('p',"Use Export case JSON to export entities with their source references.",'muted'));
 }
 function showAudit(event) {
   if(event.action!=='navigation_recorded'){details('History event',event.event_id).append(el('pre',JSON.stringify(event,null,2)));return;}

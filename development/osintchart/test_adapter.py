@@ -1,4 +1,4 @@
-"""Run against a real OSINTchart checkout: python tests/test_osintchart_adapter.py PATH."""
+"""Run against a real OSINTchart checkout: python development/osintchart/test_adapter.py PATH."""
 import copy
 import sys
 import unittest
@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(sys.argv.pop(1)).resolve() / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osint_notebook.services.case_service import CaseService
 from osint_notebook.models.types import SCHEMA_VERSION
 from osintchart_import import preview, apply_plan

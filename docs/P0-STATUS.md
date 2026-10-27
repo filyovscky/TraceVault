@@ -11,7 +11,7 @@ PASS означает проверенный сценарий в граница�
 | AC-05: выделение, toggle, restart | CSS Highlights, тексты не меняются, registered script с выданным доменным доступом, restart процесса | PASS; разрешение в QA выдано тестовым manifest, prompt вручную |
 | AC-06: изменённый источник | orphaned и ambiguous в UI/content script, ложной подсветки нет | PASS |
 | AC-07: Entity → архив | UI archive-first, точная цитата, immutable IDs/путь/SHA, версия остаётся прежней | PASS |
-| AC-08: обмен OSINTchart | JSON Schema; реальный CaseService adapter, 3 Entity/1 Capture/5 refs, повтор skip | PASS сервиса; установка в OSINTchart GUI/bridge не сделана |
+| AC-08: экспорт дела | JSON Schema; экспорт метаданных, сущностей, ссылок и контрольных сумм | PASS JSON-экспорта; внешние интеграции вынесены в [разработку](development/README.md) |
 | AC-09: оригиналы неизменны | реальные HTML/PNG до/после note/color edit имеют одинаковые digest | PASS |
 | AC-10: прерывание | durable writing event, restart, interrupted; corrupted JSON и missing sequence блокируют запись | PASS журнала; физический crash в середине FSA close вручную |
 | AC-11: темы, размеры, HiDPI | native Chrome 155 и CFT 156, 320/360/420/520, DPR 1/1.25/1.5/2 | Browser emulation PASS; реальная смена масштаба Windows вручную |

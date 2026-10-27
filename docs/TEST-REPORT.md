@@ -1,5 +1,13 @@
 # Фактические проверки
 
+## 0.5.5 — released features and development materials
+
+- Removed integration claims from the README, comparison, current architecture/acceptance descriptions and entity details. Case export is described as TraceVault JSON. Prototype adapter, contract research and Python tests moved into development; historical service results retain their original release headings there. The input specification moved to the development archive with byte-for-byte content preservation.
+- Existing JSON machine format/schema identifiers are unchanged for backward compatibility. Newly generated export filenames use __tracevault-export.json; no existing primary files are renamed or rewritten. No permissions or dependencies changed.
+- `npm run check`: ESLint, **18/18 unit tests**, clean build PASS. Existing real-browser workflow **1/1 PASS** covers three HTML archives, PNG/original image, immutable entity references, actual export file with the new name, AJV schema validation, independent hashes, offline opening, restart and interrupted-capture recovery. The third HTML fixture remains explicitly partial for its known resource limitations; it is not treated as a complete capture.
+- Relocated Python files pass syntax parsing. Adapter service tests were not rerun against a target checkout and are not claimed as current integration verification. Local documentation links and the packaged/source file equality are checked separately. Layout was not redesigned; the changed entity help text uses the existing paragraph style.
+- Final verification: **54** local documentation links resolve; all **25** extension files match source/dist/ZIP; development materials are excluded from the ZIP. Original specification bytes match the previous Git version. `git diff --check` PASS. Release SHA-256: `cf2458b7a35c4224608c01d4dd39833b3842c8e0c51015e82daffa575d9e654a`.
+
 ## 0.5.4 — durable pending payloads and interrupted-session recovery
 
 - Root cause reproduced in real Chrome: storing/retrieving an event object through chrome.storage.local preserves its data but reorders its keys; JSON.stringify then produces different bytes. The former retry rejected a valid already-written event whose audit receipt had not committed. Pending events now persist as validated, frozen JSON text; legacy object drafts migrate before disk recovery. No runtime dependencies or permissions changed.
@@ -44,7 +52,7 @@
 
 ## 0.5.0 — explicit one-window browsing sessions
 
-- Architecture/API prototype: new worker-owned recorder, no page-content auto-capture, one pinned normal window/workspace/case, native FSA writes with readback SHA-256. Existing journal/OSINTchart contract stays compatible. Required webNavigation is added for actual navigation/SPA/hash events; no dependency was added. State/messages/disk layout and interruption boundaries are in SESSION-RECORDING.md.
+- Architecture/API prototype: new worker-owned recorder, no page-content auto-capture, one pinned normal window/workspace/case, native FSA writes with readback SHA-256. Existing journal/export contract stays compatible. Required webNavigation is added for actual navigation/SPA/hash events; no dependency was added. State/messages/disk layout and interruption boundaries are in SESSION-RECORDING.md.
 - `npm run check`: ESLint, **17/17 unit tests**, clean build PASS. Final `tests/session.e2e.mjs` run **4/4 PASS**: one-window/two-window lifecycle; failure/retry/pause/restart; worker FSA prototype in CFT; same prototype in installed Chrome. Real session event files are read independently by Node and hashed. The OS directory picker selection alone is automated; neither mock writers nor Downloads storage stand in for primary files.
 - Scope scenario checks HTTP top-level link transitions, back/reload qualifiers, SPA and hash events, a real linked new tab, movement out/in, no outside-window navigation or post-Stop secret in the first session, current-page snapshot on re-entry, continued recording with the panel closed, automatic stop on selected-window close, and no case reassignment after switching the active case. It reads the exported JSON from disk, checks complete event sequence, opens the journal/event SHA details, alters a test event file and verifies export refuses the checksum mismatch. The second intentionally started session can select a different window explicitly.
 - Failure scenario deliberately removes only the test session's pinned handle record: the next event fails, collection stops in save_error with explicit pending records, later navigation stays out, restoration + Retry saves without duplicate IDs, and all files verify. Saving Pause all capture stops recording and disables Start; resuming allows an explicit new Start. Restarting the actual isolated browser ends the former session with browser_or_extension_restarted and verified stop data. This does not exercise physical disk loss, OS permission revocation UI, disk-full or power loss.
@@ -176,7 +184,7 @@
 
 - Native OS picker/permission bubbles and real Windows display-scaling changes remain manual. Browser DPR emulation and installed Chrome are covered; these tests do not certify all assistive technologies or all websites.
 - Extension reload does not reliably replace UI already injected into open sites. Refresh existing source tabs after updating. Browser/OS dialogs use their own language; source content and historical evidence are deliberately not translated.
-- Existing capture/FSA/OSINTchart boundaries remain as documented below. No OCR, video, trusted timestamp or native bridge is claimed.
+- Existing capture/FSA/export boundaries remain as documented below. No OCR, video, trusted timestamp or native bridge is claimed.
 
 ## Итерация 0.3.2 — папка, навигация, удаление исключений
 
@@ -239,7 +247,6 @@
 - Последний boundary-сценарий сначала не стартовал из-за реального low-disk: на C: осталось около 37 МБ, FSA probe вернул QuotaExceededError. Ложного успеха/записи в Downloads не было. Массовая и точечная очистка тестовых профилей были отклонены автоматической политикой. Вместо удаления выполнено обратимое NTFS-сжатие только workspace/output: 1 112 594 846 логических байтов размещены в 78 264 345 физических байтах, свободно стало около 1 ГБ. Содержимое первичных файлов не менялось; хеши затем перепроверены. Реальный disk-full во время close не заявляется проверенным.
 - После освобождения места boundary-сценарий **1/1 PASS** (18.9 с): отмена после кадра, лимит, изменение геометрии, возвращение scroll, native zoom 125% и все 3000 строк без щелей, конвертация viewport PNG. Отменённый capture сохранил кадр с корректным SHA-256.
 - Независимый `python scripts/verify_pdf.py --render`: **PASS** — 2 страницы, SHA-256 PDF/PNG, источник/UTC, footer ID, все распакованные RGB-байты PDF равны PNG, 3000 zoom-строк совпали. Первая/последняя страницы просмотрены. [Доказательные QA-артефакты](qa/0.3.0/README.md).
-- Адаптер OSINTchart: **5/5 PASS** против реального CaseService, включая сохранение full PNG/raw frame/derived PDF и derivation в реестре. Python QA-библиотеки не поставляются в ZIP; [лицензионные границы](LICENSES.md).
 
 ### Оставшиеся границы
 
@@ -271,7 +278,6 @@
 - Первый полный браузерный прогон: **9 PASS / 3 FAIL**. Public sites и workflow превысили общий лимит времени; usability завершился ошибкой Playwright trace streaming `file data stream has unexpected number of bytes` при закрытии контекста после намеренного изменения файла. Эти ошибки не скрыты.
 - Повтор public/workflow/usability: public sites PASS (23.8 с), workflow PASS (47.8 с), синхронизация PASS. Usability выявил слишком короткое ожидание закрытия редактора: запись ещё выполнялась, кнопка была disabled. Время ожидания подтверждённой дисковой операции увеличено с 5 до 25 секунд. Для сценария намеренной подмены файла отключён только Playwright trace; реальные FSA записи, проверки, clipboard и скриншоты сохранены.
 - Финальный usability: **2/2 PASS**, 38.1 и 28.9 с, включая новую проверку границ абзаца, клавиатурное сохранение, восстановление и отказ просмотра/экспорта повреждённого HTML. Всего **все 12 уникальных браузерных сценариев прошли в этой итерации с повторными запусками**; один полностью зелёный общий прогон после всех исправлений не заявляется.
-- OSINTchart: **4/4 PASS** против реального reference CaseService. Существующая интеграция не расширялась.
 - Установленный Chrome 155.0.8059.85: настоящий SIDE_PANEL и **32/32** сочетания темы/ширины/DPR PASS, отсутствие horizontal overflow и размеры PNG. Светлая 320/DPR2, тёмная 360 и палитра просмотрены визуально. [Снимки и границы проверки](qa/0.2.0/README.md).
 - Нативный ввод через Windows подтвердил Ctrl+Shift+3 → SIDE_PANEL, Ctrl+Shift+1 → HTML и Ctrl+Shift+2 → PNG; обе записи перечитаны и SHA-256 совпали. Ctrl+Shift+4 после исправления Range нативно НЕ подтверждён: computer-use остановлен инструментом из-за невозможности уверенно определить URL. Браузерная кнопка выделения и фактическое назначение этой команды проверены. Повторная нативная проверка остаётся задачей.
 
@@ -286,7 +292,6 @@
 
 - Спецификация прочитана полностью (680 строк), сохранена без изменения.
 - Репозиторий назначения пуст; clone выполнен через git http.sslBackend=schannel. Обычный TLS backend в этой среде возвращал TLS connect error.
-- OSINTchart клонирован отдельно, контракт изучен; native importer не существует в TraceVault.
 - API подтверждены документацией, браузерный прототип ещё не выполнялся.
 - MVP, визуальный QA и P1/P2 пока НЕ завершены.
 
@@ -313,8 +318,7 @@
 - Реальный restart процесса браузера, IndexedDB handle и дело восстановлены; durable writing operation → interrupted. Предыдущий FAIL выявил дефект самого QA: перезапись всего Preferences ломала данные восстановления браузера; harness теперь сохраняет существующие настройки. В продукт добавлено понятное сообщение InvalidStateError.
 - Failure E2E (2 tests) — PASS: лимит размера, AbortSignal, запрет записи (инъекция denied на границе адаптера), повтор ID без второго файла, новая версия, переключение активного дела в ходе захвата, повреждённый JSON журнала, single_case и отказ от второго дела.
 - Public sites E2E — PASS: example.com, example.org, example.net, три самостоятельных complete HTML в настоящей рабочей папке. Личные данные не использовались.
-- JSON Schema v1: Capture, Annotation, EntityDraft, EvidenceReference, OSINTchartExport; реальный экспорт workflow валидирован AJV.
-- OSINTchart adapter: 4 Python tests PASS против настоящего CaseService/schema 2 commit 1e90238, без моков моделей. Три Entity, один Capture, пять строковых evidence_refs; повторный импорт → skip без дублей; подтверждение/устаревший preview/конфликты проверены. Это in-process адаптер, не UI-плагин/Native Messaging и не запуск OSINTchart GUI.
+- JSON Schema v1: Capture, Annotation, EntityDraft, EvidenceReference and case export; реальный экспорт workflow валидирован AJV.
 - Найден реальный дефект: setPanelBehavior(openPanelOnActionClick:true) не давал activeTab в тесте. Исправлено открытием Side Panel через chrome.action.onClicked; захват после реального Extensions.triggerAction проходит.
 - Две темы, реальные browser PNG на ширинах 320/360/420/520; горизонтального overflow нет. Полная матрица DPR и native Chrome Side Panel ещё проверяется.
 
@@ -336,7 +340,6 @@
 - `npm run check`: ESLint PASS, 9/9 Node unit PASS, clean dist build PASS.
 - Единый последовательный Playwright прогон: 9/9 PASS за 3.8 минуты (failures ×2, native Chrome, prototype, public sites, reattachment, scale, UI, workflow).
 - Дополнительный persistent inbox E2E: PASS; после уточнения обработки повторной доставки и privacy guard — targeted inbox + UI 2/2 PASS. Итого 10 уникальных browser E2E сценариев проверены; последний полный прогон из 10 одним запуском ещё не выполнялся, дополнительные изменения проверены целевыми тестами.
-- OSINTchart CaseService adapter: 4/4 Python PASS (реальные модели/сервисы reference checkout, без GUI).
 - Нагрузка: 2000 искусственных failed-capture metadata events прочитаны с реального диска за 2050 мс, таймер UI выполнился 403 раза; 25 строк на странице, Unicode search возвращает нужный материал. Это не 2000 реальных фиксаций.
 - Offline same-origin iframe проверен отдельно внутри сохранённого HTML; HTTP(S) обращений нет. Проверка сохранённых материалов/PNG, изменения заметок, предыдущих версий и corrupt-file digest PASS.
 - Новый UI race исправлен: редактор закрывается после завершения записи/обновления, повторная отправка заблокирована на время операции. Старое сообщение больше не затирает результат следующего экспорта.

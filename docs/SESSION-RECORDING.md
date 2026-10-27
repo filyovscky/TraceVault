@@ -26,7 +26,7 @@ Statuses: starting → recording → stopping → stopped. Any write failure →
 
 Workspace: cases/<case UUID>/sessions/<session UUID>/<sequence>-<event UUID>.json. Single-case mode omits cases/<case UUID>/. Every event has schema_version=1, stable IDs, sequence, type, observed_at, timezone/offset/system-clock source and window ID. Navigation also retains the raw Chrome browser timestamp, document ID, transition type/qualifiers and source URL/title when available. Raw Chrome timestamp and extension wall clock are kept separate because Chrome documents possible process-clock skew.
 
-writeNew performs SHA-256/size readback; the existing append-only case journal references the event and Artifact descriptor under navigation_recorded. Recovery does not invent original file-write timestamps. Export re-verifies every source Artifact and writes a new verified exports/<UUID>__session.json with format tracevault-navigation-session and event/Artifact pairs. It adds navigation_exported to the journal. The OSINTchart exchange contract and existing schemas are unchanged.
+writeNew performs SHA-256/size readback; the existing append-only case journal references the event and Artifact descriptor under navigation_recorded. Recovery does not invent original file-write timestamps. Export re-verifies every source Artifact and writes a new verified exports/<UUID>__session.json with format tracevault-navigation-session and event/Artifact pairs. It adds navigation_exported to the journal. Existing export contracts and data schemas are unchanged.
 
 ### Recovery without rewriting originals, 0.5.4
 

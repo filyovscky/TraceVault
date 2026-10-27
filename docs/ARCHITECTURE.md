@@ -1,6 +1,6 @@
 # TraceVault: архитектура v1
 
-Решение принято до реализации 22.10.2026. Полный входной документ: SPECIFICATION_RU.md.
+Решение принято до реализации 22.10.2026. [Архив исходного ТЗ](development/ORIGINAL-SPECIFICATION_RU.md) сохраняется как исторический документ; текущий статус определяется README и матрицей приёмки. [Разрабатываемые функции](development/README.md) отделены от доступных.
 
 ## Инициализация рабочей папки, 0.4.6
 
@@ -42,7 +42,7 @@ UI → content: `TV_SELECTION`, `TV_RENDER` (только аннотации т�
 
 0.5.1 adds [compact lossless capture](COMPACT-CAPTURE.md): explicit frame retention policy, independent strip PNG encoding, PDF predictor streams, Blob writes and bounded rebuildable caches. Old primary files remain immutable; this is not a journal-schema migration or a fixed total memory limit.
 
-0.5.0 adds [window-scoped sessions](SESSION-RECORDING.md): worker-owned recording, pinned case/window, native FSA event artifacts, explicit pending/error/retry, restart boundaries and a separate verified session JSON export. Existing OSINTchart schemas remain unchanged. [Measured resource use and limits](PERFORMANCE.md).
+0.5.0 adds [window-scoped sessions](SESSION-RECORDING.md): worker-owned recording, pinned case/window, native FSA event artifacts, explicit pending/error/retry, restart boundaries and a separate verified session JSON export. Existing data schemas remain unchanged. [Measured resource use and limits](PERFORMANCE.md).
 
 В 0.2 просмотр и экспорт оригинала каждый раз читают файл целиком, сверяют размер и SHA-256 с Artifact и используют неизменяемый Blob этих проверенных байтов. Это защищает от случайной подмены файла после захвата; переписывание самого журнала локальным злоумышленником не исключено. Большой файл потребует памяти на чтение и snapshot; лимит захвата по умолчанию остаётся 64 МБ.
 
@@ -59,7 +59,7 @@ QA 0.3.2 воспроизвёл InvalidStateError на close() настояще�
 0. Исследование/API: реальная запись/перечитывание FSA, сохранение handle, три HTML fixture, лицензии. Результаты отдельно от предположений документации.
 1. P0: папка, дела, архивы/PNG, метаданные/хеш, аннотации/Entity, поиск/экспорт, восстановление. Все AC из ТЗ отражаются в TEST-REPORT.md.
 2. Тесты реального Chromium, офлайн/файлы, ошибки, визуальные снимки обоих цветов и размеров. Исправления до дополнительных функций.
-3. P1/P2 после закрытия P0. Native bridge/OSINTchart importer — отдельный этап с реальными моделями и preview.
+3. P1/P2 после закрытия P0. Внешние интеграции — отдельный этап в [разрабатываемых функциях](development/README.md), с проверкой реальных моделей и preview.
 
 ## Источники проверки
 
