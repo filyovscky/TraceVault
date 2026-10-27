@@ -1,5 +1,6 @@
 import {now} from './domain.js';
 import {captureLayout} from './capture-layout.js';
+import {smallerPNG} from './png.js';
 export const MAX_PIXELS=24_000_000;
 export function planTiles(width,height,vw,vh,dpr=1) {
   if(![width,height,vw,vh,dpr].every(n=>Number.isFinite(n) && n>0))throw new Error("Invalid page dimensions");
@@ -27,10 +28,10 @@ export async function screenshot(tab,signal) {
   await chrome.storage.session.set({lastScreenshotAt:Date.now()});
   const url=await chrome.tabs.captureVisibleTab(tab.windowId,{format:'png'});await assertActive();signal?.throwIfAborted();return (await fetch(url)).blob();
 }
-export async function fullScreenshot(tab,{signal,onFrame,onProgress=()=>{}}) {
+export async function fullScreenshot(tab,{signal,onFrame,onProgress=()=>{},compact=true,maxBytes}) {
   const original=await pageGeometry(tab.id),plan=planTiles(original.width,original.height,original.cw,original.ch,original.dpr),frames=[];
-  const canvas=document.createElement('canvas');canvas.width=plan.width;canvas.height=plan.height;
-  const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error("Canvas is unavailable");ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
+  const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:compact});if(!ctx)throw new Error("Canvas is unavailable");
   let sx,sy,adjustments,result,failure,overlayPixels=0;const token=crypto.randomUUID(),overlays=[];
   const consistent=g=>{if(g.url!==original.url || ['width','height','vw','vh','cw','ch','dpr'].some(k=>Math.abs(g[k]-original[k])>0.01))throw new Error("Page geometry, zoom or URL changed. Full-page capture stopped.");};
   try{
@@ -69,9 +70,11 @@ export async function fullScreenshot(tab,{signal,onFrame,onProgress=()=>{}}) {
       }finally{bitmap.close();}
     }
     signal?.throwIfAborted();consistent(await pageGeometry(tab.id));
-    for(const overlay of overlays)ctx.drawImage(overlay.bitmap,overlay.destination.x,overlay.destination.y);
-    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error("Could not assemble the full PNG");
-    result={blob,metadata:{capture_scope:'full_page',viewport:{width:original.vw,height:original.vh,dpr:original.dpr},document_size:{width:original.width,height:original.height},pixel_width:canvas.width,pixel_height:canvas.height,frames,original_scroll:{x:original.x,y:original.y},page_zoom:await chrome.tabs.getZoom(tab.id),capture_method:'tracevault-scroll-stitch-v2',screenshot_adjustments:{...adjustments,fixed_overlays:overlays.map(({bitmap:_,...data})=>data)}},warnings:[{type:'sequential_capture',reason:"Full capture is sequential; hidden, virtualized and unloaded content is not guaranteed."},...(adjustments.fixed_roots || adjustments.sticky_in_flow?[{type:'layout_normalized',reason:`Viewport-fixed elements shown once: ${adjustments.fixed_roots}; sticky elements captured in natural flow: ${adjustments.sticky_in_flow}. Temporary presentation changes are recorded with the source frames.`}]:[]),...(adjustments.scan_limited?[{type:'layout_scan_limited',reason:'Only the first 20000 document elements were inspected for fixed/sticky presentation.'}]:[])]};
+    for(const overlay of overlays){ctx.drawImage(overlay.bitmap,overlay.destination.x,overlay.destination.y);overlay.bitmap.close();}
+    const optimized=compact?await smallerPNG(canvas,{opaque:true,signal,maxBytes}):null;
+    const blob=optimized?.blob || await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error("Could not assemble the full PNG");
+    result={blob,metadata:{capture_scope:'full_page',viewport:{width:original.vw,height:original.vh,dpr:original.dpr},document_size:{width:original.width,height:original.height},pixel_width:canvas.width,pixel_height:canvas.height,frames,original_scroll:{x:original.x,y:original.y},page_zoom:await chrome.tabs.getZoom(tab.id),capture_method:'tracevault-scroll-stitch-v2',screenshot_adjustments:{...adjustments,fixed_overlays:overlays.map(({bitmap:_,...data})=>data)}},warnings:[{type:'sequential_capture',reason:"Full capture is sequential; hidden, virtualized and unloaded content is not guaranteed."},...(adjustments.fixed_roots || adjustments.sticky_in_flow?[{type:'layout_normalized',reason:`Viewport-fixed elements shown once: ${adjustments.fixed_roots}; sticky elements captured in natural flow: ${adjustments.sticky_in_flow}. Temporary presentation changes are described in capture metadata.`}]:[]),...(adjustments.scan_limited?[{type:'layout_scan_limited',reason:'Only the first 20000 document elements were inspected for fixed/sticky presentation.'}]:[])]};
+    if(optimized)result.metadata.image_encoding=optimized.encoding;
   }catch(e){failure=e;}finally{
     for(const overlay of overlays)overlay.bitmap.close();
     canvas.width=canvas.height=1;

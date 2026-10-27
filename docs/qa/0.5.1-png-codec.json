@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "kind": "text",
+      "equal": true,
+      "format": "png",
+      "lossless": true,
+      "pixel_resampling": false,
+      "encoder": "tracevault-strip-png-v1",
+      "source_png_bytes": 197131,
+      "saved_png_bytes": 159080,
+      "encoder_peak_strip_bytes": 368524,
+      "peak": 368524
+    },
+    {
+      "kind": "gradient",
+      "equal": true,
+      "format": "png",
+      "lossless": true,
+      "pixel_resampling": false,
+      "encoder": "tracevault-strip-png-v1",
+      "source_png_bytes": 1073269,
+      "saved_png_bytes": 429611,
+      "encoder_peak_strip_bytes": 368524,
+      "peak": 368524
+    },
+    {
+      "kind": "noise",
+      "equal": true,
+      "format": "png",
+      "lossless": true,
+      "pixel_resampling": false,
+      "encoder": "tracevault-strip-png-v1",
+      "source_png_bytes": 3035447,
+      "saved_png_bytes": 2649838,
+      "encoder_peak_strip_bytes": 368524,
+      "peak": 368524
+    },
+    {
+      "kind": "alpha",
+      "equal": true,
+      "format": "png",
+      "lossless": true,
+      "pixel_resampling": false,
+      "encoder": "tracevault-strip-png-v1",
+      "source_png_bytes": 21708,
+      "saved_png_bytes": 5929,
+      "encoder_peak_strip_bytes": 422992,
+      "peak": 422992
+    }
+  ],
+  "abort": "AbortError",
+  "limit": "PNG raster exceeds the size limit"
+}

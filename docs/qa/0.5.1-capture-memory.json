@@ -1,0 +1,27 @@
+{
+  "scope": "Whole isolated browser process private bytes sampled every ~100 ms for fixed process IDs; includes site, browser, GPU and extension. One run each; not extension-only RSS, not a guaranteed upper bound.",
+  "results": [
+    {
+      "version": "0.5.0",
+      "browser": "156.0.8078.4",
+      "baselinePrivateBytes": 362704896,
+      "peakPrivateBytes": 701882368,
+      "samples": 85,
+      "captureMs": 16896.141200000005,
+      "cpuSeconds": 4.815951,
+      "artifactBytes": 786106,
+      "frames": 20
+    },
+    {
+      "version": "0.5.1",
+      "browser": "156.0.8078.4",
+      "baselinePrivateBytes": 393560064,
+      "peakPrivateBytes": 469856256,
+      "samples": 103,
+      "captureMs": 20019.613299999997,
+      "cpuSeconds": 3.374425999999999,
+      "artifactBytes": 84375,
+      "frames": 0
+    }
+  ]
+}

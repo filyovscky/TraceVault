@@ -2,6 +2,7 @@ import {VERSION, now, uuid, clock, assertWebTab, makeExport, normalize, sha256,l
 import {writeNew, readFile, readVerifiedFile, exclusive} from './storage.js';
 import {fullScreenshot,screenshot} from './screenshot.js';
 import {pngToPdf} from './pdf.js';
+import {optimizePNG} from './png.js';
 import {append, casePath, loadState} from './repository.js';
 import {snapshotDocument, buildArchive,resourceCredentials} from './capture.js';
 
@@ -11,8 +12,9 @@ export async function inject(tabId) {
 }
 export async function selected(tabId) {await inject(tabId);return chrome.tabs.sendMessage(tabId,{type:'TV_SELECTION'});}
 export async function broadcastAnnotations(caseId,state,enabled,hiddenDomains=[]) {
-  const values=await chrome.storage.local.get('annotationCache'),cache=values.annotationCache || {};
-  cache[caseId]=Object.values(state.annotations).filter(a=>!a.deleted);
+  // Only the active case is needed by restoring content scripts. Other cases
+  // remain on disk and are reloaded on activation, rather than cached forever.
+  const cache={[caseId]:Object.values(state.annotations).filter(a=>!a.deleted)};
   await chrome.storage.local.set({annotationCache:cache,annotationsEnabled:enabled,hiddenAnnotationDomains:hiddenDomains});
   const tabs=await chrome.tabs.query({});
   await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:cache[caseId].filter(a=>a.source_url===tab.url),enabled:enabled && !hiddenDomains.some(host=>{try{return new URL(tab.url).hostname===host;}catch{return false;}})})));
@@ -50,24 +52,27 @@ export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page'
         try {for(;;){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>(settings.maxBytes || 64*1024*1024))throw new Error("Image exceeds the size limit");chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}
         payload=new Blob(chunks,{type:mime});folder='attachments';metadata={capture_method:'original-image-fetch',image_source_url:imageUrl,image_final_url:response.url};
       } else if(['full','pdf'].includes(kind)) {
-        let bytes=0;const limit=settings.maxBytes || 64*1024*1024;
-        const full=await fullScreenshot(tab,{signal,onProgress,onFrame:async(blob,frame)=>{
+        let bytes=0;const limit=settings.maxBytes || 64*1024*1024,keepFrames=settings.screenshotStorage==='source_frames';
+        const full=await fullScreenshot(tab,{signal,onProgress,compact:!keepFrames,maxBytes:limit,onFrame:async(blob,frame)=>{
+          if(!keepFrames)return {retained:false};
           signal?.throwIfAborted();bytes+=blob.size;if(bytes>limit)throw new Error("Frames exceed the size limit");
           const artifact=await writeNew(root,casePath(workspace,caseId)+`screenshots/${id}__frame${String(frame.index).padStart(3,'0')}.png`,blob,'image/png');artifact.capture_id=id;artifact.kind='screenshot_frame';
           record.times.artifact_write_started_at ||= artifact.artifact_write_started_at;
           await save('frame_written',{artifacts:[...record.artifacts,artifact],frames:[...(record.frames || []),{...frame,artifact_id:artifact.artifact_id,sha256:artifact.sha256}]});
-          return {artifact_id:artifact.artifact_id,sha256:artifact.sha256};
+          return {retained:true,artifact_id:artifact.artifact_id,sha256:artifact.sha256};
         }});
         if(bytes+full.blob.size>limit)throw new Error("Frames and full PNG exceed the size limit");
-        payload=full.blob;mime='image/png';ext='png';folder='screenshots';metadata=full.metadata;record.warnings=full.warnings;
+        payload=full.blob;mime='image/png';ext='png';folder='screenshots';metadata={...full.metadata,frame_storage:keepFrames?'source_frames':'not_retained',frames:full.metadata.frames};record.warnings=full.warnings;
+        if(!keepFrames)record.warnings.push({type:'source_frames_not_retained',reason:'Compact lossless PNG: intermediate viewport frames were not saved. Stitch geometry and presentation metadata are retained; independent reconstruction from source frames is unavailable.'});
       } else {
         const [active]=await chrome.tabs.query({active:true,windowId:tab.windowId});if(active.id!==tabId) throw new Error("Keep the source tab active during screenshot capture");
         const [{result:viewport}]=await chrome.scripting.executeScript({target:{tabId},func:()=>({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,url:location.href})});
         if(viewport.url!==tab.url) throw new Error("URL changed before screenshot capture");
         const png=await screenshot(tab,signal);
         const [after]=await chrome.tabs.query({active:true,windowId:tab.windowId});if(after.id!==tabId) throw new Error("Active tab changed during screenshot capture");
-        payload=png;mime='image/png';ext='png';folder='screenshots';
-        const bitmap=await createImageBitmap(payload);metadata={viewport,pixel_width:bitmap.width,pixel_height:bitmap.height,page_zoom:await chrome.tabs.getZoom(tabId),capture_method:'chrome.tabs.captureVisibleTab'};bitmap.close();
+        const optimized=settings.screenshotStorage==='source_frames'?null:await optimizePNG(png,{signal,maxBytes:settings.maxBytes});
+        payload=optimized?.blob || png;mime='image/png';ext='png';folder='screenshots';
+        const bitmap=await createImageBitmap(payload);metadata={viewport,pixel_width:bitmap.width,pixel_height:bitmap.height,page_zoom:await chrome.tabs.getZoom(tabId),capture_method:'chrome.tabs.captureVisibleTab',...(optimized?{image_encoding:optimized.encoding}:{})};bitmap.close();
       }
       signal?.throwIfAborted();
       const final=await chrome.tabs.get(tabId);if(final.url!==tab.url) throw new Error("Page URL changed before capture completed");

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 — compact lossless captures and bounded caches, 27.10.2026
+
+- Default Compact screenshot storage: retain one full-resolution PNG, omit duplicate intermediate viewport files. PNG + source frames remains selectable for independently reconstructing the stitch. Each capture records its retention policy; no old originals are deleted or recompressed.
+- Original strip PNG encoder, RGB/RGBA Sub/Up filtering, native deflate and smaller-file fallback. No downsampling or lossy quality setting. Tests compare exact decoded pixels, including 11px text and alpha. Encoding diagnostics record source/output bytes and bounded strip buffers.
+- Read-heavy capture canvases use software-oriented contexts; the full stitch canvas is allocated once, overlay bitmaps close before encoding, and scanline buffers are reused. FSA writes accept immutable Blobs without holding a second full input ArrayBuffer throughout the write; readback SHA-256/size checks and overwrite protection stay intact.
+- PDF v2 uses filtered strip compression with PNG predictors. It remains a lossless PNG derivative with the same source hash and no OCR. Independent PDF decoding checks exact RGB equality.
+- Journal cache is limited to 2048 entries / 4 MiB of source JSON bytes, whichever comes first. That is a cache budget, not a total RAM limit. Replay still loads/validates every event. Browser annotation cache retains only the active case; other cases are restored from disk on activation.
+- No new dependencies, permissions or incompatible data-schema changes. Large full-page canvases, source-page memory, journal replay and compressed output still consume memory; Compact is not a fixed RAM cap.
+
 ## 0.5.0 — one-window browsing sessions, 27.10.2026
 
 - Explicit Start/Stop in the side panel, pinned to one normal window and the starting case. Record top-level HTTP(S) navigation, SPA/hash changes, titles, tab membership and browser-provided linked-tab relationships. Other windows and incognito are excluded; moved tabs are checked before queueing and before writing.

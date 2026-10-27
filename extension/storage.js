@@ -38,13 +38,13 @@ export async function exists(root,path) {
 export async function writeNew(root,path,data,mime='application/json') {
   if (await root.queryPermission({mode:'readwrite'}) !== 'granted') throw new DOMException("Workspace access missing. Use Restore folder access.",'NotAllowedError');
   if (await exists(root,path)) throw new Error("File already exists; overwriting is forbidden: "+path);
-  const bytes = data instanceof Blob ? await data.arrayBuffer() : new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data,null,2));
-  const before = await sha256(bytes);
+  const payload=data instanceof Blob?data:new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data,null,2)),length=payload instanceof Blob?payload.size:payload.byteLength;
+  const before = await sha256(payload instanceof Blob?await payload.arrayBuffer():payload);
   const started = now();
   let handle=await fileHandle(root,path,true),retries=0;
   for(;;){
     let writable,stage='createWritable';
-    try {writable=await handle.createWritable();stage='write';await writable.write(bytes);stage='close';await writable.close();break;}
+    try {writable=await handle.createWritable();stage='write';await writable.write(payload);stage='close';await writable.close();break;}
     catch(e){
       try {await writable?.abort();}catch{/* The browser may already have closed the stream. */}
       // Windows/Chromium can reject close() with InvalidStateError and leave the
@@ -61,7 +61,7 @@ export async function writeNew(root,path,data,mime='application/json') {
     }
   }
   const written = now(), stored = await handle.getFile(), after = await sha256(await stored.arrayBuffer());
-  if (before !== after || stored.size !== bytes.byteLength) throw new Error("Written file verification failed: "+path);
+  if (before !== after || stored.size !== length) throw new Error("Written file verification failed: "+path);
   return {artifact_id:uuid(), relative_path:path, mime_type:mime, byte_length:stored.size, sha256:after, created_at:started, artifact_write_started_at:started, written_at:written, verification_status:'verified_readback',time_context:clock()};
 }
 export async function probe(root) {

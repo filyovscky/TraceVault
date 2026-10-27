@@ -14,6 +14,7 @@ for(const installed of [false,true])test(`fixed header once, full seam coverage 
   try{
     const panel=await extensionPage(context);await chooseDirectory(panel,path.join(out,'workspace'));await panel.locator('#case-code').fill('FIXED');await panel.locator('#case-title').fill('Fixed header regression');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     const source=await context.newPage(),cdp=await context.newCDPSession(source),{windowId}=await cdp.send('Browser.getWindowForTarget');await cdp.send('Browser.setWindowBounds',{windowId,bounds:{width:1400,height:950}});
+    await panel.locator('#settings-toggle').click();await panel.locator('#screenshot-storage').selectOption('source_frames');await panel.locator('#save-settings').click();await expect(panel.locator('#settings')).not.toBeVisible();
     const results=[];
     for(const fixturePath of ['/fixed-wide','/fixed-short']){
       await source.goto(fixture.url+fixturePath);await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await source.evaluate(()=>scrollTo(111,177));const before=await presentation(source);

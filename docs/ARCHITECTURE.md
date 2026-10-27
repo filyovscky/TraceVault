@@ -40,6 +40,8 @@ UI → content: `TV_SELECTION`, `TV_RENDER` (только аннотации т�
 
 ## Безопасность
 
+0.5.1 adds [compact lossless capture](COMPACT-CAPTURE.md): explicit frame retention policy, independent strip PNG encoding, PDF predictor streams, Blob writes and bounded rebuildable caches. Old primary files remain immutable; this is not a journal-schema migration or a fixed total memory limit.
+
 0.5.0 adds [window-scoped sessions](SESSION-RECORDING.md): worker-owned recording, pinned case/window, native FSA event artifacts, explicit pending/error/retry, restart boundaries and a separate verified session JSON export. Existing OSINTchart schemas remain unchanged. [Measured resource use and limits](PERFORMANCE.md).
 
 В 0.2 просмотр и экспорт оригинала каждый раз читают файл целиком, сверяют размер и SHA-256 с Artifact и используют неизменяемый Blob этих проверенных байтов. Это защищает от случайной подмены файла после захвата; переписывание самого журнала локальным злоумышленником не исключено. Большой файл потребует памяти на чтение и snapshot; лимит захвата по умолчанию остаётся 64 МБ.

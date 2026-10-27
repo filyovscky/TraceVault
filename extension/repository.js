@@ -33,6 +33,14 @@ export async function createCase(root, workspace, title, code='') {
 // Rebuildable in-memory index. Every replay still enumerates real disk files and
 // checks size/mtime; cache is discarded on restart and never becomes primary data.
 const eventCache=new Map();
+const CACHE_BYTES=4*1024*1024,CACHE_ENTRIES=2048;let cacheBytes=0;
+function cacheEvent(key,value){
+  const old=eventCache.get(key);if(old){cacheBytes-=old.size;eventCache.delete(key);}
+  if(value.size>CACHE_BYTES)return;
+  eventCache.set(key,value);cacheBytes+=value.size;
+  while(cacheBytes>CACHE_BYTES || eventCache.size>CACHE_ENTRIES){const first=eventCache.keys().next().value;cacheBytes-=eventCache.get(first).size;eventCache.delete(first);}
+}
+export const journalCacheStats=()=>({entries:eventCache.size,sourceBytes:cacheBytes,maxSourceBytes:CACHE_BYTES,maxEntries:CACHE_ENTRIES});
 export async function loadState(root,workspace,id) {
   const caseInfo=await readJSON(root,casePath(workspace,id)+'case.json');
   if(caseInfo.schema_version!==1 || caseInfo.case_id!==id)throw new Error("Case missing from this workspace or incompatible schema");
@@ -44,11 +52,11 @@ export async function loadState(root,workspace,id) {
     for(let offset=0;offset<handles.length;offset+=32) {
       const batch=await Promise.all(handles.slice(offset,offset+32).map(async({name,handle})=>{
         const file=await handle.getFile(),key=workspace.workspace_id+'/'+id+'/'+name,cached=eventCache.get(key);
-        if(cached && cached.size===file.size && cached.modified===file.lastModified)return cached.event;
+        if(cached && cached.size===file.size && cached.modified===file.lastModified){eventCache.delete(key);eventCache.set(key,cached);return cached.event;}
         let event;
         try {event=JSON.parse(await file.text());}
         catch { throw new Error("Damaged journal "+name+". Back up the folder and restore the file. Changes are blocked."); }
-        eventCache.set(key,{size:file.size,modified:file.lastModified,event});return event;
+        cacheEvent(key,{size:file.size,modified:file.lastModified,event});return event;
       }));events.push(...batch);
     }
   } catch(e) { if (e.name !== 'NotFoundError') throw e; }

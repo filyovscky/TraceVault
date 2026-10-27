@@ -1,0 +1,24 @@
+[
+  {
+    "browser": "cft",
+    "pixel_width": 1500,
+    "pixel_height": 2400,
+    "png_pixels_equal": true,
+    "pdf_rgb_identical": true,
+    "pages": 2,
+    "png_sha256": "771c874463fb1157029ff45f369e85667faded265b7b6990330211d8bd27fcec",
+    "pdf_sha256": "1c2b72a43dc8fb4e975be7cd27b6f33096f6b0d46836a91db2f35eff103c091f",
+    "pdf_bytes": 37104
+  },
+  {
+    "browser": "installed",
+    "pixel_width": 1500,
+    "pixel_height": 2400,
+    "png_pixels_equal": true,
+    "pdf_rgb_identical": true,
+    "pages": 2,
+    "png_sha256": "771c874463fb1157029ff45f369e85667faded265b7b6990330211d8bd27fcec",
+    "pdf_sha256": "76907ae05a031a3d1f9864b47b793c0e763b7ae3d5f70b1b1d89c14b6566c833",
+    "pdf_bytes": 37104
+  }
+]
