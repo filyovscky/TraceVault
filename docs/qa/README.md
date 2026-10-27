@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+0.5.0: real session recorder in the extension document, 320 px, [light](0.5.0-session-light.png) and [dark](0.5.0-session-dark.png). Real one-window/two-window, FSA/hash/export/restart scenarios are documented in TEST-REPORT.md. [Raw resource measurements before](0.5.0-session-performance-before.json) and [after](0.5.0-session-performance-after.json); these include the entire isolated browser where stated, not extension-only RSS.
+
 0.4.1 capture regression: [wide page](0.4.1-fixed-wide.png), [short page with large overlap](0.4.1-fixed-short.png). Actual saved PNGs: one fixed header/footer and one natural-flow sticky bar. Pixel/metadata reconstruction checks are documented in TEST-REPORT.md; supplied user evidence was not rewritten.
 
 0.4.0: English icon UI. [Dark](0.4-panel-dark-320.png), [light](0.4-panel-light-320.png), [Settings](0.4-settings-dark-320.png), [hover description](0.4-tooltip-320.png), [description inside a modal](0.4-settings-tooltip-320.png). Native Chrome checks 32 main-panel and 32 Settings combinations, matching tool-grid geometry and internal horizontal overflow. Earlier screenshots below are historical.

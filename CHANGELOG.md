@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — one-window browsing sessions, 27.10.2026
+
+- Explicit Start/Stop in the side panel, pinned to one normal window and the starting case. Record top-level HTTP(S) navigation, SPA/hash changes, titles, tab membership and browser-provided linked-tab relationships. Other windows and incognito are excluded; moved tabs are checked before queueing and before writing.
+- Background FSA writes continue after closing the panel. Separate immutable JSON event files with readback SHA-256, ordinary case audit references, pending/error/retry states, idempotent retry and explicit stop on window close or browser/extension restart. No automatic reassignment of window IDs.
+- Session journal, original metadata/checksum details and verified JSON export. Pausing capture stops the session. Source content is captured separately. No dependencies or OSINTchart schema changes; `webNavigation` is a new required permission.
+- Reuse the journal snapshot under the existing writer lock, and throttle list refresh during recording. A measured 100-event burst improved from 70.5 to 53.9 seconds and 35.0 to 19.5 whole-test-browser CPU seconds. Panel retained JS heap grew by about 0.4 MB; whole-browser memory is explicitly not extension-only memory. High-volume journal indexing remains a bottleneck.
+
 ## 0.4.8 — create a workspace subfolder, 27.10.2026
 
 - Picking a populated folder without workspace.json creates a separate TraceVault subfolder. Occupied names, including regular files, are skipped as TraceVault-2, TraceVault-3, etc. Existing workspaces and empty selections still open in place.

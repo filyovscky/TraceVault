@@ -10,7 +10,7 @@ const paths={
   html:'M14 3H5v18h14V8zM14 3v5h5M10 11l-3 3 3 3m4-6 3 3-3 3',
   camera:'M3 7h4l2-3h6l2 3h4v13H3zM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   scan:'M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5M8 7h8v10H8zM10 11l2 2 2-2m-2-3v5',
-  pdf:'M14 3H5v18h14V8zM14 3v5h5',stop:'M6 6h12v12H6z',
+  pdf:'M14 3H5v18h14V8zM14 3v5h5',stop:'M6 6h12v12H6z',record:'M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   highlight:'m14 3 7 7-10 10-7-7zM8 17l-4 4H2m9-15 7 7',
   quote:'M10 6H4v7h4c0 3-2 5-4 5m16-12h-6v7h4c0 3-2 5-4 5',
   note:'M4 3h16v12l-6 6H4zM14 21v-6h6M8 8h8m-8 4h5',

@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.4.8](releases/TraceVault-0.4.8.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.5.0](releases/TraceVault-0.5.0.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.4.8. Updates from 0.4.3 or earlier add required all-site access; Chrome may require you to approve the new permission or re-enable the extension.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.0. This version adds `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** before creating a case; existing files stay in the original folder.
 
@@ -21,6 +21,7 @@ Hover an icon or focus it with the keyboard to see its English description. Icon
 | Header | Commands, open workspace tab, settings |
 | Capture | HTML document, visible-area camera, full-page PNG scan, PDF document |
 | Annotate selection | Highlight, quote, note, entity |
+| Browsing session | Start this window, Stop, journal, export JSON |
 | Case sections | Materials, Highlights, Entities, History (visible names) |
 
 The active section has a labelled heading and an underlined icon. **Highlights** lists highlights, quotes and notes, with separate counts and a type filter. Search and filters are remembered separately for each section while the panel is open; Reset filters clears the current section. Empty lists distinguish missing records from filtered-out records and offer guidance or Clear filters. A free note is available in Highlights. Record details provide preview, checksum verification, copy, export and other relevant actions; each has a tooltip.
@@ -59,6 +60,16 @@ Full PNG scrolls both axes, keeps original frames and their coordinates/timestam
 PDF is a lossless raster A4 derivative of a verified PNG, without OCR or HTML reflow. It has its own SHA-256 and source derivation. Open it from the workspace in an external viewer; blob-PDF preview is not supported by the extension's strict CSP.
 
 Highlight selection saves immediately without opening an editor; the note is optional. Right-click a visible highlight and use **Edit highlight note** or **Delete highlight here**. Deletion is a reversible journal update; use Undo in TraceVault to restore it. A right-click outside a highlight returns a clear error. Annotations use CSS Highlights, without rewriting page text or saved originals. An unarchived reference is marked **Live page only**. Use the archive-and-link icon in the editor to bind a quote to a verified HTML capture. Edits, hide and undo are journal events; existing evidence references remain pinned to their original version.
+
+## Record one window
+
+Connect a case, then press the circle in **Browsing session**. The session stays pinned to that window and case, even when you switch cases or close the panel. It records HTTP(S) URLs, titles, timestamps, top-level navigations, SPA/hash changes, tab entry/exit and browser-provided linked-tab relationships. All tabs in the selected window participate; other windows do not. A tab moved out stops contributing; moving it in records its current page and resumes tracking. Existing annotation functionality remains independent of this recording scope.
+
+Stop with the square. Closing the selected window also stops the session. After a browser/extension restart it ends explicitly; no other window is silently adopted. Saving **Pause all capture** also stops recording. Start remains disabled until you resume.
+
+The history icon filters **History** to the session; event details offer the URL, times, original metadata and checksum verification. The export icon writes a real JSON file into the case's `exports` directory after re-verifying source event files. Each event is a separate verified JSON under `sessions/<session UUID>/`, referenced from the case's ordinary audit journal. A write error stops collection and exposes pending events with **Retry saving pending events**; reconnect the original workspace before retrying.
+
+This records a browsing trail, **not page contents**. Use HTML/PNG/PDF capture to preserve the page itself. It does not reconstruct pre-session history, every redirect hop, failed navigation or user input. System time is not an independent timestamp. Sudden process/disk failure may lose browser callbacks that have not reached persistent pending storage; it is not a lossless forensic network recorder. One active session is supported. See [architecture and limits](docs/SESSION-RECORDING.md), [measured performance](docs/PERFORMANCE.md) and [comparison with adjacent tools](docs/COMPARISON.md).
 
 ## OSINTchart and build
 

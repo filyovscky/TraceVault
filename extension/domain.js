@@ -1,4 +1,4 @@
-export const VERSION = '0.4.8';
+export const VERSION = '0.5.0';
 export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();
@@ -12,7 +12,7 @@ export function matchesDomain(url, filter) {
   }catch{return false;}
 }
 export function recordUrls(record, refs={}) {
-  return [...new Set([record.source?.final_url,record.source_url,...(record.evidence_refs || []).map(id=>refs[id]?.source_url)].filter(Boolean))];
+  return [...new Set([record.source?.final_url,record.source_url,record.details?.event?.url,record.details?.event?.source_url,...(record.evidence_refs || []).map(id=>refs[id]?.source_url)].filter(Boolean))];
 }
 export function citation(capture, quote='') {
   const rows=[capture.source.title,capture.source.final_url,`Captured (UTC): ${capture.times.capture_started_at}`,`Capture ID: ${capture.capture_id}`];

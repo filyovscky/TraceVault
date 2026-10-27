@@ -1,0 +1,31 @@
+{
+  "scope": "Isolated Chrome for Testing, whole browser RSS/private bytes include source renderer, extension and browser/GPU; panel heap is V8 after explicit GC. Not an extension-only RSS measurement.",
+  "browser": "156.0.8078.4",
+  "before": {
+    "at": 1793102672656,
+    "panelHeapBytes": 2765324,
+    "processPrivateBytes": 389410816,
+    "processWorkingSetBytes": 690061312,
+    "cpuSeconds": 5.949561999999999
+  },
+  "idle": {
+    "at": 1793102683565,
+    "panelHeapBytes": 2789184,
+    "processPrivateBytes": 338120704,
+    "processWorkingSetBytes": 670855168,
+    "cpuSeconds": 6.306669000000001
+  },
+  "after": {
+    "at": 1793102755046,
+    "panelHeapBytes": 3190368,
+    "processPrivateBytes": 383897600,
+    "processWorkingSetBytes": 741978112,
+    "cpuSeconds": 41.283791
+  },
+  "idleElapsedMs": 12138.632499999992,
+  "drainedMs": 70455.34700000001,
+  "totalEvents": 103,
+  "sessionFileBytes": 76303,
+  "idleCpuSeconds": 0.35710700000000184,
+  "workCpuSeconds": 34.977122
+}

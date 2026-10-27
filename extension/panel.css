@@ -29,3 +29,5 @@ nav button[aria-current]{background:var(--surface);font-weight:600}
 #case-dialog .dialog-actions>span{font-size:11px}
 body.workspace #setup-progress{grid-column:1}
 body.workspace main:has(#collection[hidden]){display:block;max-width:520px}
+body.workspace #session-section{grid-column:1}
+#session-section h2{margin-bottom:4px}#session-section>p{margin:6px 0 10px}#session-state{overflow-wrap:anywhere}

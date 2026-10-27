@@ -59,6 +59,11 @@ export async function loadState(root,workspace,id) {
 }
 export async function append(root,workspace,id,action,recordType,value,details={}) {
   const state = await loadState(root,workspace,id);
+  return appendLoaded(root,workspace,id,state,action,recordType,value,details);
+}
+// Caller must keep the disk-writer lock from loadState through this append.
+// Reuse that verified snapshot rather than enumerating the journal twice.
+export async function appendLoaded(root,workspace,id,state,action,recordType,value,details={}) {
   const e = {schema_version:SCHEMA,event_id:uuid(),sequence:state.audit.length ? state.audit.at(-1).sequence+1 : 1,case_id:id,recorded_at:now(),time_context:clock(),action,record_type:recordType,value,details};
   await writeNew(root,casePath(workspace,id)+`events/${e.event_id}.json`,e);
   return e;

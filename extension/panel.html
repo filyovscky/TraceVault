@@ -29,6 +29,11 @@
       <h3>Annotate selection</h3><div class="tool-grid" role="group" aria-label="Annotation tools"><button id="selection-highlight" data-icon="highlight">Highlight selection</button><button id="selection-quote" data-icon="quote">Save quote</button><button id="selection-note" data-icon="note">Add note to selection</button><button id="selection-entity" data-icon="entity">Create entity from selection</button></div>
       <details id="capture-help"><summary>Capture notes</summary><p class="muted">Visible personal data is included. Full-page capture scrolls the page and may include changing content. PDF is a raster copy without OCR.</p></details>
     </section>
+    <section id="session-section" hidden aria-labelledby="session-heading">
+      <h2 id="session-heading">Browsing session</h2><p class="muted">Record URLs and titles from this window. Page contents are saved separately.</p>
+      <div class="tool-grid" role="group" aria-label="Browsing session controls"><button id="session-start" data-icon="record">Start recording this window</button><button id="session-stop" data-icon="stop">Stop recording</button><button id="session-journal" data-icon="history">Open session journal</button><button id="session-export" data-icon="export">Export saved session as JSON</button></div>
+      <p id="session-state" class="muted" role="status">Not recording</p><button id="session-retry" data-icon="refresh" data-show-label hidden>Retry saving pending events</button>
+    </section>
     <section id="collection" hidden aria-labelledby="collection-title">
       <div class="row"><h2 id="collection-title">Materials</h2><div class="actions"><button id="manual-note" data-icon="note" hidden>Create free note</button><button id="export-case" data-icon="export">Export case as JSON</button></div></div>
       <nav aria-label="Case sections"><button data-view="captures" data-icon="archive" data-show-label aria-current="page">Materials</button><button data-view="annotations" data-icon="highlight" data-show-label>Highlights</button><button data-view="entities" data-icon="entity" data-show-label>Entities</button><button data-view="audit" data-icon="history" data-show-label>History</button></nav>

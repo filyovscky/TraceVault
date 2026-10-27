@@ -4,6 +4,7 @@ import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,ma
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
 import {initControls,setActionLabel} from './icons.js';
+import {exportSession} from './session-recorder.js';
 const $=id=>document.getElementById(id);
 initControls();
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
@@ -22,6 +23,24 @@ function switchView(next){
 }
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt',folderLabel='';
+let navigationState=null,recorderBusy=false,ownWindowId=null,sessionRefreshTimer;
+const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Navigation',history_state:'Page state changed',fragment:'Page fragment changed',tab_entered:'Tab entered',tab_left:'Tab left',page_title:'Page title',link_target:'Linked tab'};
+function selectedSessionId(){return navigationState?.case_id===activeCase && navigationState.workspace_id===workspace?.workspace_id?navigationState.session_id:[...state.audit].reverse().find(e=>e.action==='navigation_recorded')?.details.session_id;}
+function renderSession(){
+  const ready=!!(root && workspace && activeCase),active=['starting','recording','stopping'].includes(navigationState?.status),pendingCount=navigationState?.pending?.length || 0,id=selectedSessionId();
+  $('session-section').hidden=!ready && !active && !pendingCount;
+  $('session-start').disabled=!ready || preferences.paused || initializing || connecting || caseSaving || busy || recorderBusy || active || pendingCount>0;
+  $('session-stop').disabled=recorderBusy || navigationState?.status!=='recording';
+  $('session-journal').disabled=!id || recorderBusy;
+  $('session-export').disabled=!id || recorderBusy || (id===navigationState?.session_id && (active || pendingCount>0));
+  $('session-retry').hidden=!pendingCount || navigationState?.status!=='save_error';$('session-retry').disabled=recorderBusy;
+  const scope=navigationState?.window_id===ownWindowId?'this window':'another window';
+  $('session-state').textContent=recorderBusy?'Updating session…':!navigationState?'Not recording':`${active?'Recording '+scope:'Stopped'} · ${navigationState.case_label} · ${navigationState.saved} events saved${pendingCount?' · '+pendingCount+' pending':''}${navigationState.error?' · '+navigationState.error:''}`;
+}
+async function sessionCommand(type,extra={}){
+  recorderBusy=true;renderSession();
+  try{const result=await chrome.runtime.sendMessage({type,...extra});if(result?.error)throw new Error(result.error);navigationState=result.state;return result.state;}finally{recorderBusy=false;renderSession();}
+}
 function updateSetup(){
   const folderReady=!!(root && workspace),ready=folderReady && !!activeCase,locked=initializing || connecting || caseSaving,needsAccess=folderPermission!=='granted';
   $('collection').hidden=!ready;
@@ -39,6 +58,7 @@ function updateSetup(){
   $('case-title').readOnly=caseSaving;$('case-code').readOnly=caseSaving;
   for(const id of ['capture-page','capture-screen','capture-full','capture-pdf','selection-highlight','selection-quote','selection-note','selection-entity','manual-note','export-case','archive-first'])$(id).disabled=locked || busy || !ready;
   for(const id of ['pick-root','change-root','reauthorize'])$(id).disabled=locked || busy;
+  renderSession();
 }
 function openCaseDialog(){
   if(initializing || connecting || caseSaving)throw new Error('Wait for workspace setup to finish.');
@@ -207,6 +227,7 @@ async function saveDialog(event) {
   }finally{dialogSaving=false;submit.disabled=false;}
 }
 function renderList() {
+  renderSession();
   $('collection-title').textContent={captures:'Materials',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
   $('manual-note').hidden=view!=='annotations';
   $('capture-type-label').hidden=view!=='captures';$('capture-status-label').hidden=view!=='captures';$('annotation-type-label').hidden=view!=='annotations';
@@ -226,7 +247,7 @@ function renderList() {
     const urls=recordUrls(r,state.refs);
     if(domain && !urls.some(url=>matchesDomain(url,domain)))return false;
     if($('current-page-only').checked && !urls.includes(tab?.url))return false;
-    const at=r.times?.capture_started_at || r.created_at || r.recorded_at;
+    const at=r.times?.capture_started_at || r.details?.event?.observed_at || r.created_at || r.recorded_at;
     return !date || (at && at.slice(0,10)>=date);
   }).sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned) || (b.times?.capture_started_at || b.created_at || b.recorded_at || '').localeCompare(a.times?.capture_started_at || a.created_at || a.recorded_at || ''));
   const maxPage=Math.max(0,Math.ceil(rows.length/25)-1);page=Math.min(page,maxPage);$('list').replaceChildren();
@@ -237,6 +258,7 @@ function renderList() {
     if(view==='captures'){title=`${row.pinned?"Pinned · ":''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?"Full PNG":row.kind==='screenshot'?'PNG':"Image"} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
     else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${{text_highlight:'Highlight',quote:'Quote',note:'Note'}[row.type] || 'Annotation'} · ${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · unconfirmed · ${row.evidence_refs.length} sources · ${localTime(row.created_at)}`;}
+    else if(row.action==='navigation_recorded'){const e=row.details.event;title=`${navigationNames[e.type] || e.type}${e.title?' · '+e.title:''}`;meta=`${localTime(e.observed_at)}${e.previous_url?'\n'+e.previous_url+' → ':e.url?'\n':''}${e.url || ''}`;}
     else {title=row.action;meta=localTime(row.recorded_at);}
     b.append(el('span',title,'item-title'),el('span',meta,'item-meta'));item.append(b);$('list').append(item);
   }
@@ -291,7 +313,14 @@ function showEntity(id) {
   for(const ref of e.evidence_refs)referenceDetails(box,state.refs[ref]);
   box.append(el('p',"Use Export case JSON to transfer data. Direct OSINTchart integration is not available in this version.",'muted'));
 }
-function showAudit(event) {details("History event",event.event_id).append(el('pre',JSON.stringify(event,null,2)));}
+function showAudit(event) {
+  if(event.action!=='navigation_recorded'){details('History event',event.event_id).append(el('pre',JSON.stringify(event,null,2)));return;}
+  const value=event.details.event,artifact=event.details.artifact,box=details(navigationNames[value.type] || value.type,event.event_id),dl=el('dl');
+  field(dl,'Observed',localTime(value.observed_at));field(dl,'UTC',value.observed_at);field(dl,'Session ID',value.session_id);field(dl,'Previous URL',value.previous_url);field(dl,'Title',value.title);field(dl,'Reason',value.reason);field(dl,'File',artifact.relative_path);field(dl,'SHA-256',artifact.sha256,'hash');box.append(dl);
+  if(value.url)box.append(link(value.url,'Open recorded URL'));
+  box.append(button('Verify checksum',async()=>{const result=await verifyArtifact(root,workspace,event.case_id,artifact);status(result.ok?'SHA-256 verified':'Session event checksum mismatch',!result.ok);}));
+  const raw=el('details');raw.append(el('summary','Event metadata'),el('pre',JSON.stringify(value,null,2)));box.append(raw);
+}
 async function convertPdf(record,source){
   await canWrite();if(busy)throw new Error("Wait for the current operation");const c={...context(),caseId:record.case_id};busy=true;setBusy(true);status("Creating PDF from verified PNG…");
   try{const pdf=await convertScreenshotToPdf(c.root,c.workspace,c.caseId,record.capture_id,source.artifact_id,preferences);status("PDF written and verified: "+pdf.relative_path);if(activeCase===c.caseId){await refresh();showCapture(record.capture_id);}}finally{busy=false;setBusy(false);}
@@ -365,6 +394,18 @@ $('case-form').addEventListener('submit',event=>{
 $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
 action('grant-site',()=>chrome.tabs.create({url:'chrome://extensions/?id='+chrome.runtime.id}));
+action('session-start',async()=>{
+  if(recorderBusy)return;recorderBusy=true;renderSession();
+  try{
+    await canWrite();const c=context(),id=uuid(),window=await chrome.windows.getCurrent(),info=cases.find(item=>item.case_id===c.caseId);
+    await setting('session-target:'+id,{...c,caseLabel:info.code+' · '+info.title});
+    await sessionCommand('TV_SESSION_START',{sessionId:id,windowId:window.id});status('Recording this window. URLs and titles only.');await refresh();
+  }finally{recorderBusy=false;renderSession();}
+});
+action('session-stop',async()=>{await sessionCommand('TV_SESSION_STOP');status('Session stopped and saved.');await refresh();});
+action('session-retry',async()=>{await sessionCommand('TV_SESSION_RETRY');status('Pending session events saved.');await refresh();});
+action('session-journal',()=>{const id=selectedSessionId();if(!id)return;switchView('audit');resetFilters();$('search').value=id;renderList();$('collection').scrollIntoView({block:'start'});});
+action('session-export',async()=>{await canWrite();const id=selectedSessionId(),c=context();const artifact=await exportSession(c.root,c.workspace,c.caseId,id);status('Session export written and verified: '+artifact.relative_path);await refresh();});
 action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('capture-full',()=>runCapture('full'));action('capture-pdf',()=>runCapture('pdf'));action('cancel',()=>controller?.abort());
 for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>beginAnnotation(name));action('manual-note',()=>beginAnnotation('manual'));
 action('archive-first',async()=>{if(!pending)return;const p=pending;const source=await chrome.tabs.get(p.tabId);if(source.url!==p.sourceUrl)throw new Error("URL changed");const result=await runCapture('page',{tabId:p.tabId,caseId:p.caseId,id:uuid()});if(!['completed','partial'].includes(result.state))throw new Error("Archive not verified");p.captureId=result.capture_id;$('reference-state').textContent=`Linked to ${result.evidence_number} · ${result.capture_id}`;});
@@ -383,7 +424,7 @@ action('settings-toggle',()=>{$('theme').value=preferences.theme;$('paused').che
 $('settings').addEventListener('close',()=>{$('settings-toggle').setAttribute('aria-expanded','false');document.documentElement.dataset.theme=preferences.theme;});
 action('shortcuts',()=>chrome.tabs.create({url:'chrome://extensions/shortcuts'}));
 $('theme').addEventListener('change',()=>{document.documentElement.dataset.theme=$('theme').value;});
-action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error("Limit: 1–256 MB");preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,annotations:$('annotations-toggle').checked,maxBytes:mb*1024*1024};await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();$('settings').close();status("Settings saved");});
+action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error("Limit: 1–256 MB");if($('paused').checked && navigationState?.status==='recording')await sessionCommand('TV_SESSION_STOP');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,annotations:$('annotations-toggle').checked,maxBytes:mb*1024*1024};await setting('preferences',preferences);renderSession();await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();$('settings').close();status("Settings saved");});
 async function toggleAnnotations(){preferences.annotations=!preferences.annotations;$('annotations-toggle').checked=preferences.annotations;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();status(preferences.annotations?'Annotations enabled':'Annotations hidden');}
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
 action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status("Annotation restored in its original case");});
@@ -394,6 +435,10 @@ const commandActions=[
   {id:'capture-screen',label:"Capture visible area as PNG"},
   {id:'capture-full',label:"Capture full page as PNG"},
   {id:'capture-pdf',label:"Capture page as PDF (raster image)"},
+  {id:'session-start',label:"Start recording this window"},
+  {id:'session-stop',label:"Stop browsing session"},
+  {id:'session-journal',label:"Open browsing session journal"},
+  {id:'session-export',label:"Export browsing session as JSON"},
   {id:'selection-highlight',label:"Highlight selected quote"},
   {id:'selection-entity',label:"Create entity from selection"},
   {id:'note',label:"Create free note",run:()=>beginAnnotation('manual')},
@@ -434,6 +479,11 @@ async function refreshShortcuts(){
 action('refresh-shortcuts',refreshShortcuts);
 window.addEventListener('focus',()=>refreshShortcuts().catch(()=>{}));
 chrome.storage.onChanged.addListener(changes=>{
+  if(changes.navigationRecorder){
+    navigationState=changes.navigationRecorder.newValue;renderSession();
+    if(navigationState?.status!=='recording'){clearTimeout(sessionRefreshTimer);sessionRefreshTimer=null;refresh().catch(reportError);}
+    else if(!sessionRefreshTimer)sessionRefreshTimer=setTimeout(()=>{sessionRefreshTimer=null;refresh().catch(reportError);},2000);
+  }
   if(Object.keys(changes).some(k=>k.startsWith('command:')))processInbox().catch(e=>status(errorText(e),true));
   const next=changes.activeContext?.newValue;
   if(next && next.owner!==sessionId && next.workspaceId===workspace?.workspace_id && next.caseId!==activeCase){
@@ -449,6 +499,7 @@ chrome.permissions.onRemoved.addListener(scheduleSource);
 chrome.permissions.onAdded.addListener(scheduleSource);
 window.addEventListener('focus',scheduleSource);
 async function init() {
+  ownWindowId=(await chrome.windows.getCurrent()).id;navigationState=(await chrome.storage.local.get('navigationRecorder')).navigationRecorder || null;renderSession();
   if(new URL(location.href).searchParams.has('workspace'))document.body.classList.add('workspace');
   await readPreferences();document.documentElement.dataset.theme=preferences.theme;$('theme').value=preferences.theme;$('paused').checked=preferences.paused;$('max-size').value=preferences.maxBytes/1024/1024;$('annotations-toggle').checked=preferences.annotations;
   const handle=await setting('root');
