@@ -86,4 +86,25 @@ export async function openWorkspace(root, mode='workspace',{persist=true}={}) {
   if(persist)await setting('root',root);
   return metadata;
 }
+export async function prepareWorkspace(selected,mode='workspace',{createChild=false}={}){
+  if(!['workspace','single_case'].includes(mode))throw new Error('Unknown workspace layout');
+  if(createChild && !await exists(selected,'workspace.json')){
+    let populated=false;for await(const entry of selected.entries()){if(entry){populated=true;break;}}
+    if(populated){
+      for(let number=1;number<=10000;number++){
+        const name=number===1?'TraceVault':'TraceVault-'+number;
+        try{await selected.getDirectoryHandle(name);continue;}
+        catch(e){if(e.name==='TypeMismatchError')continue;if(e.name!=='NotFoundError')throw e;}
+        const child=await selected.getDirectoryHandle(name,{create:true});
+        // Do not adopt contents introduced between checking and creating the name.
+        let occupied=false;for await(const entry of child.entries()){if(entry){occupied=true;break;}}
+        if(occupied)continue;
+        const metadata=await openWorkspace(child,mode,{persist:false});
+        return {root:child,metadata,createdIn:selected.name};
+      }
+      throw new Error('Could not find a free TraceVault folder name. Choose another parent folder.');
+    }
+  }
+  return {root:selected,metadata:await openWorkspace(selected,mode,{persist:false}),createdIn:null};
+}
 export const exclusive = fn => navigator.locks.request('tracevault-disk-writer',fn);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.8 — create a workspace subfolder, 27.10.2026
+
+- Picking a populated folder without workspace.json creates a separate TraceVault subfolder. Occupied names, including regular files, are skipped as TraceVault-2, TraceVault-3, etc. Existing workspaces and empty selections still open in place.
+- The actual child handle is validated and persisted; reload/reconnection does not create another directory. Case setup and the folder indicator show the selected parent/child location during creation. Folder changes preserve the selected workspace layout for new directories.
+- Corrupt existing workspace metadata remains an explicit error. Existing user files, prior workspaces and captured artifact bytes are not overwritten.
+
 ## 0.4.7 — optional case code, 27.10.2026
 
 - Case code is optional and blank by default. Empty/whitespace/omitted codes are assigned in the repository when the case is created: first unused CASE-001, CASE-002, etc. Existing codes are read from disk under the caller's write lock.

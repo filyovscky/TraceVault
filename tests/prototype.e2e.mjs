@@ -1,9 +1,30 @@
 import {test,expect} from '@playwright/test';
-import {mkdir,readFile,readdir} from 'node:fs/promises';
+import {mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {launch,extensionPage,chooseDirectory} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
+
+for(const {installed,mode} of [{installed:false,mode:'workspace'},{installed:true,mode:'workspace'},{installed:false,mode:'single_case'}])test(`nonempty folder creates a separate workspace: ${mode}${installed?' — installed Chrome':''}`,async()=>{
+  test.setTimeout(120000);const run=Date.now(),parent=path.resolve('output/playwright/populated-parent-'+run),context=await launch(path.resolve('output/playwright/populated-profile-'+run),{installed}),fixture=await fixtureServer();
+  await mkdir(parent,{recursive:true});const original=Buffer.from('Existing files must stay unchanged');await writeFile(path.join(parent,'keep.txt'),original);
+  try{
+    const panel=await extensionPage(context);await panel.setViewportSize({width:360,height:900});
+    if(mode==='single_case'){await panel.locator('.setup-options summary').click();await panel.locator('#workspace-mode').selectOption(mode);}
+    await chooseDirectory(panel,parent);await expect(panel.locator('#case-dialog')).toBeVisible();await expect(panel.locator('#case-target')).toContainText(path.basename(parent)+' / TraceVault');await expect(panel.locator('#status')).toContainText('Created workspace:');
+    expect((await readdir(parent)).sort()).toEqual(['TraceVault','keep.txt']);const firstRoot=path.join(parent,'TraceVault'),metadata=JSON.parse(await readFile(path.join(firstRoot,'workspace.json'),'utf8'));expect(metadata.mode).toBe(mode);
+    await panel.screenshot({path:path.resolve(`output/playwright/0.4.8-subfolder-${installed?'installed':mode}.png`)});
+    await panel.locator('#case-title').fill('Saved in a child folder');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible({timeout:30000});await expect(panel.locator('#workspace-hint')).toContainText('Ready');
+    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await expect(panel.locator('#source-url')).toHaveText(source.url());await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:30000});
+    const record=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures)[0];});const artifact=path.join(firstRoot,record.artifacts[0].relative_path),bytes=await readFile(artifact);expect(createHash('sha256').update(bytes).digest('hex')).toBe(record.artifacts[0].sha256);
+    await panel.reload();await expect(panel.locator('#case-select')).toContainText('CASE-001');expect((await readdir(parent)).sort()).toEqual(['TraceVault','keep.txt']);
+    // A directory and a file can both occupy candidate names. Neither is reused.
+    await writeFile(path.join(parent,'TraceVault-2'),original);await chooseDirectory(panel,parent,{button:'change-root'});await expect(panel.locator('#case-dialog')).toBeVisible();await expect(panel.locator('#case-target')).toContainText(path.basename(parent)+' / TraceVault-3');expect(JSON.parse(await readFile(path.join(parent,'TraceVault-3','workspace.json'),'utf8')).mode).toBe(mode);
+    await panel.locator('#case-dialog [data-close-dialog]').click();await chooseDirectory(panel,firstRoot,{button:'change-root'});await expect(panel.locator('#case-select')).toContainText('CASE-001');await expect(panel.locator('#case-dialog')).not.toBeVisible();
+    expect((await readdir(parent)).sort()).toEqual(['TraceVault','TraceVault-2','TraceVault-3','keep.txt']);expect(await readFile(path.join(parent,'keep.txt'))).toEqual(original);expect(await readFile(path.join(parent,'TraceVault-2'))).toEqual(original);expect(await readFile(artifact)).toEqual(bytes);expect(await panel.evaluate(async()=>{const s=await import('./storage.js');return (await s.setting('root')).name;})).toBe('TraceVault');
+    expect(await panel.evaluate(()=>document.querySelector('main').scrollWidth<=document.querySelector('main').clientWidth)).toBe(true);
+  }finally{await context.close();fixture.server.close();}
+});
 
 for(const installed of [false,true])test(`guided setup blocks disconnected case creation and duplicate submit${installed?' — installed Chrome':''}`,async()=>{
   test.setTimeout(150000);const run=Date.now(),directory=path.resolve('output/playwright/setup-workspace-'+run),context=await launch(path.resolve('output/playwright/setup-profile-'+run),{installed}),fixture=await fixtureServer();

@@ -1,4 +1,4 @@
-import {setting,openWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
+import {setting,prepareWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
 import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
 import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,convertScreenshotToPdf} from './service.js';
@@ -21,7 +21,7 @@ function switchView(next){
   document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});renderList();
 }
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
-let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt';
+let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt',folderLabel='';
 function updateSetup(){
   const folderReady=!!(root && workspace),ready=folderReady && !!activeCase,locked=initializing || connecting || caseSaving,needsAccess=folderPermission!=='granted';
   $('collection').hidden=!ready;
@@ -46,7 +46,7 @@ function openCaseDialog(){
   if(folderPermission!=='granted')throw new Error('Restore folder access before creating a case.');
   if(workspace.mode==='single_case' && cases.length)throw new Error('This folder supports only one case');
   $('case-title').value='';$('case-code').value='';
-  $('case-target').textContent=`Save in: ${root.name}`;$('case-save-state').textContent='Materials and notes will be grouped in this case.';
+  $('case-target').textContent=`Save in: ${folderLabel || root.name}`;$('case-save-state').textContent='Materials and notes will be grouped in this case.';
   $('case-dialog').showModal();$('case-title').focus();
 }
 function status(message,error=false) {$('status').textContent=message;$('status').parentElement.dataset.error=String(error);const alert=document.querySelector('dialog[open] .dialog-error');if(alert){alert.hidden=!error;alert.textContent=error?message:'';}}
@@ -85,22 +85,22 @@ async function renderFolder() {
   $('setup').hidden=!!root;$('workspace-state').hidden=!root;
   if(!root){updateSetup();return;}
   const permission=await root.queryPermission({mode:'readwrite'});
-  $('folder-state').textContent=`${root.name} · ${permission==='granted'?"Read/write access":"Access required"}`;
+  $('folder-state').textContent=`${folderLabel || root.name} · ${permission==='granted'?"Read/write access":"Access required"}`;
   $('folder-state').title=$('folder-state').textContent;
   $('reauthorize').hidden=permission==='granted' && !!workspace;
   setActionLabel($('reauthorize'),permission==='granted'?'Reconnect folder':'Restore folder access','key',true);
   folderPermission=permission;updateSetup();
 }
-async function connect(handle,mode='workspace') {
+async function connect(handle,mode='workspace',{createChild=false}={}) {
   if(connecting || caseSaving || busy)throw new Error('Wait for the current operation before changing folders.');
-  const previousWorkspaceId=workspace?.workspace_id;connecting=true;updateSetup();let recovered=0;
+  const previousWorkspaceId=workspace?.workspace_id;connecting=true;updateSetup();let recovered=0,createdIn;
   try{
   const next=await exclusive(async()=>{
-    const metadata=await openWorkspace(handle,mode,{persist:false}),found=await listCases(handle,metadata);
-    recovered=await recover(handle,metadata,found);await setting('root',handle);
-    return {metadata,found};
+    const prepared=await prepareWorkspace(handle,mode,{createChild}),found=await listCases(prepared.root,prepared.metadata);
+    recovered=await recover(prepared.root,prepared.metadata,found);await setting('root',prepared.root);
+    return {...prepared,found};
   });
-  root=handle;workspace=next.metadata;cases=next.found;activeCase=null;state={captures:{},annotations:{},entities:{},refs:{},audit:[]};
+  root=next.root;workspace=next.metadata;createdIn=next.createdIn;folderLabel=createdIn?`${createdIn} / ${root.name}`:root.name;cases=next.found;activeCase=null;state={captures:{},annotations:{},entities:{},refs:{},audit:[]};
   for(const key of Object.keys(statuses))delete statuses[key];selectedId=null;
   if(previousWorkspaceId!==workspace.workspace_id){lastDeleted=null;$('undo-delete').hidden=true;}$('details').hidden=true;
   const {activeContext}=await chrome.storage.local.get('activeContext'),saved=activeContext?.workspaceId===workspace.workspace_id?activeContext.caseId:await setting('activeCase');activeCase=cases.some(c=>c.case_id===saved)?saved:cases[0]?.case_id || null;
@@ -108,6 +108,7 @@ async function connect(handle,mode='workspace') {
   if(recovered)status(`Interrupted operations found: ${recovered}. Review the history and files.`,true);
   }finally{connecting=false;updateSetup();}
   if(!cases.length && !initializing && folderPermission==='granted' && !$('case-dialog').open)openCaseDialog();
+  return {createdIn,folderLabel};
 }
 async function setCases(publish=true) {
   $('case-select').replaceChildren(...cases.map(c=>{const o=el('option',c.code+' · '+c.title);o.value=c.case_id;o.title=c.title;return o;}));
@@ -342,8 +343,8 @@ async function contextHighlight(command){
   await updateAnnotation(c.root,c.workspace,c.caseId,a.annotation_id,{deleted:true});lastDeleted={...c,id:a.annotation_id};$('undo-delete').hidden=false;await refresh();await refreshSource();$('details').hidden=true;status('Highlight deleted. Undo is available.');
   await chrome.tabs.sendMessage(command.tabId,{type:'TV_FEEDBACK',message:'Highlight deleted. Undo is available in TraceVault.'}).catch(()=>{});
 }
-action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle,$('workspace-mode').value);status("Folder access verified by writing and reading a test file");});
-action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'});await connect(handle);status("Workspace connected");});
+action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'}),result=await connect(handle,$('workspace-mode').value,{createChild:true});status(result.createdIn?`Created workspace: ${result.folderLabel}`:"Folder access verified by writing and reading a test file");});
+action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'}),result=await connect(handle,workspace?.mode || 'workspace',{createChild:true});status(result.createdIn?`Created workspace: ${result.folderLabel}`:"Workspace connected");});
 action('reauthorize',async()=>{if(!root)throw new Error("Choose a workspace folder");if(await root.requestPermission({mode:'readwrite'})!=='granted'){await renderFolder();throw new Error("Chrome denied write access. Use Change workspace folder to select the same folder again.");}await connect(root);status("Folder access restored and verified by writing and reading");});
 action('new-case',openCaseDialog);
 $('case-form').addEventListener('submit',event=>{
