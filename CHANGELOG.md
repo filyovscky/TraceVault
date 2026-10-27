@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4 — recover interrupted session writes, 27.10.2026
+
+- Fix false "different bytes" failures: chrome.storage.local can reorder keys in object values. Pending events are now frozen as validated JSON text before persistence/writing; legacy object drafts migrate on retry.
+- Reuse a matching uncommitted event in place even when JSON formatting/key order differs. The audit references its actual original bytes and SHA-256; event values, IDs, timestamps and array order must match.
+- Preserve empty/truncated/invalid uncommitted files and write a verified event to a deterministic retry path, recording the preserved files' hashes and lengths. Valid conflicting events, corrupted committed artifacts and invalid audit journals still block recovery.
+- Verify committed event data as well as its checksum before clearing an already-published pending draft. Persist retry errors; no silent overwrite, deletion, restart of collection, new permissions or dependencies.
+
 ## 0.5.3 — compact URL display, 27.10.2026
 
 - Current page, capture/session lists and URL detail fields use one-line middle ellipsis, preserving the beginning and ending. Layout adapts to available width with CSS, without canvas measurement or per-element observers.

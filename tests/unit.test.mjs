@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {freezeSessionEvent,parseSessionEvent,sameSessionEvent} from '../extension/session-format.js';
 import {planTiles} from '../extension/screenshot.js';
 import {resourceCredentials} from '../extension/capture.js';
 import {casePath,listCases,createCase} from '../extension/repository.js';
@@ -8,6 +9,13 @@ import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab
 
 test('shipped UI, manifest and runtime messages are English; archived content is external data',async()=>{for(const file of (await readdir('extension')).filter(f=>/\.(js|html|json)$/u.test(f)))assert.doesNotMatch(await readFile('extension/'+file,'utf8'),/[А-Яа-яЁё]/u,file);});
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
+
+test('session recovery ignores JSON object order only; frozen payload and event identity remain exact',()=>{
+  const value={schema_version:1,event_id:'11111111-1111-4111-8111-111111111111',session_id:'22222222-2222-4222-8222-222222222222',case_id:'33333333-3333-4333-8333-333333333333',sequence:3,type:'navigation',observed_at:'2026-10-27T12:00:00.000Z',url:'https://example.org/?full=1&end=2',time_context:{timezone_id:'Europe/Moscow',clock_source:'system_clock'},transition_qualifiers:['forward_back','client_redirect'],title:'Unicode Ω 😀'};
+  const text=freezeSessionEvent(value),reordered=Object.fromEntries(Object.entries(value).reverse());reordered.time_context=Object.fromEntries(Object.entries(value.time_context).reverse());assert.notEqual(JSON.stringify(reordered,null,2),text);assert.ok(sameSessionEvent(value,reordered));assert.equal(freezeSessionEvent(text),text);assert.deepEqual(parseSessionEvent(text),value);
+  for(const changed of [{...value,title:'different'},{...value,sequence:4},{...value,url:value.url+'x'},{...value,transition_qualifiers:[...value.transition_qualifiers].reverse()},{...value,title:null}])assert.equal(sameSessionEvent(value,changed),false);
+  assert.throws(()=>parseSessionEvent('{partial'));assert.throws(()=>parseSessionEvent(JSON.stringify({...value,event_id:'../escape'})));assert.throws(()=>parseSessionEvent(JSON.stringify({...value,observed_at:'not a date'})));
+});
 test('missing workspace metadata blocks case paths, listing and creation before any disk access',async()=>{
   const root=new Proxy({},{get(){throw new Error('Unexpected disk access');}});
   for(const workspace of [null,undefined,{}, {mode:'invalid'}]){

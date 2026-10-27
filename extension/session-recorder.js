@@ -1,6 +1,7 @@
 import {setting,exclusive,writeNew,exists,readFile,readJSON,readVerifiedFile} from './storage.js';
 import {append,appendLoaded,loadState,casePath} from './repository.js';
 import {uuid,now,clock,sha256,VERSION} from './domain.js';
+import {freezeSessionEvent,parseSessionEvent,sameSessionEvent} from './session-format.js';
 
 const KEY='navigationRecorder';
 const web=url=>/^https?:\/\//u.test(url || '');
@@ -10,25 +11,41 @@ export const recorderIngress=()=>ingressSession;
 export function serializeRecorder(task){const result=chain.then(()=>navigator.locks.request('tracevault-navigation-recorder',task));chain=result.catch(()=>{});return result;}
 async function epoch(){const saved=await chrome.storage.session.get('navigationEpoch');if(saved.navigationEpoch)return saved.navigationEpoch;const id=uuid();await chrome.storage.session.set({navigationEpoch:id});return id;}
 export async function recorderState(){return (await chrome.storage.local.get(KEY))[KEY] || null;}
-async function put(state){await chrome.storage.local.set({[KEY]:state});}
+function freezePending(state){let changed=false;for(let i=0;i<state.pending.length;i++)if(typeof state.pending[i]!=='string'){state.pending[i]=freezeSessionEvent(state.pending[i]);changed=true;}return changed;}
+async function put(state){freezePending(state);await chrome.storage.local.set({[KEY]:state});}
 function event(state,type,data={}){return {schema_version:1,event_id:uuid(),session_id:state.session_id,case_id:state.case_id,window_id:state.window_id,sequence:state.next_sequence++,type,observed_at:now(),time_context:clock(),...data};}
 async function target(state){const saved=await setting('session-target:'+state.session_id);if(!saved?.root || saved.workspace?.workspace_id!==state.workspace_id || saved.caseId!==state.case_id)throw new Error('The original session workspace is unavailable. Reconnect its folder before retrying.');return saved;}
-async function artifactFor(root,path,value){
-  if(!await exists(root,path))return writeNew(root,path,value);
-  const file=await readFile(root,path),expected=new TextEncoder().encode(JSON.stringify(value,null,2)),hash=await sha256(await file.arrayBuffer());
-  if(file.size!==expected.byteLength || hash!==await sha256(expected))throw new Error('Session event already exists with different bytes: '+path);
-  return {artifact_id:value.event_id,relative_path:path,mime_type:'application/json',byte_length:file.size,sha256:hash,verification_status:'verified_readback',recovered_existing:true};
+async function artifactFor(root,path,text,value){
+  const expected=new TextEncoder().encode(text),expectedHash=await sha256(expected),preserved=[];
+  // Only files without a committed audit receipt reach here. Never repair a
+  // committed artifact this way, and never overwrite even an empty old file.
+  for(let attempt=0;attempt<=8;attempt++){
+    const candidate=attempt?path.replace(/\.json$/u,`__retry-${attempt}.json`):path;
+    if(!await exists(root,candidate)){
+      const artifact=await writeNew(root,candidate,text);
+      return preserved.length?{...artifact,session_recovery:{reason:'uncommitted_invalid_file',preserved_files:preserved}}:artifact;
+    }
+    const file=await readFile(root,candidate);if(file.size>Math.max(expected.byteLength*4,1024*1024))throw new Error('Existing session event is unexpectedly large. Original preserved: '+candidate);
+    const bytes=await file.arrayBuffer(),hash=await sha256(bytes);let actual;
+    try{actual=parseSessionEvent(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
+    catch {preserved.push({relative_path:candidate,byte_length:bytes.byteLength,sha256:hash,status:'uncommitted_invalid_json',detected_at:now()});continue;}
+    if(!sameSessionEvent(actual,value))throw new Error('Session event contains different event data. Original preserved; review required: '+candidate);
+    return {artifact_id:value.event_id,relative_path:candidate,mime_type:'application/json',byte_length:bytes.byteLength,sha256:hash,verification_status:'verified_readback',recovered_existing:true,existing_representation:hash===expectedHash?'exact_payload':'equivalent_json',recovery_checked_at:now(),...(preserved.length?{session_recovery:{reason:'uncommitted_invalid_file',preserved_files:preserved}}:{})};
+  }
+  throw new Error('Too many interrupted session files. Originals preserved; review required: '+path);
 }
 async function flush(state){
   if(!state.pending.length)return;
+  if(freezePending(state))await put(state);
   const saved=await target(state);
   await exclusive(async()=>{
     while(state.pending.length){
-      const value=state.pending[0],current=await loadState(saved.root,saved.workspace,saved.caseId);
+      const text=state.pending[0],value=parseSessionEvent(text),current=await loadState(saved.root,saved.workspace,saved.caseId);
+      if(value.case_id!==state.case_id || value.session_id!==state.session_id)throw new Error('Pending event does not belong to the original session/case');
       const prior=current.audit.find(e=>e.action==='navigation_recorded' && e.details?.event?.event_id===value.event_id);
-      if(prior)await readVerifiedFile(saved.root,prior.details.artifact);
+      if(prior){const file=await readVerifiedFile(saved.root,prior.details.artifact);if(!sameSessionEvent(parseSessionEvent(await file.text()),value) || !sameSessionEvent(prior.details.event,value))throw new Error('Committed session event conflicts with pending data. Original preserved.');}
       else{
-        const path=casePath(saved.workspace,saved.caseId)+`sessions/${state.session_id}/${String(value.sequence).padStart(6,'0')}-${value.event_id}.json`,artifact=await artifactFor(saved.root,path,value);
+        const path=casePath(saved.workspace,saved.caseId)+`sessions/${state.session_id}/${String(value.sequence).padStart(6,'0')}-${value.event_id}.json`,artifact=await artifactFor(saved.root,path,text,value);
         await appendLoaded(saved.root,saved.workspace,saved.caseId,current,'navigation_recorded',null,null,{session_id:state.session_id,event:value,artifact});
       }
       state.pending.shift();state.saved++;await put(state);
@@ -91,7 +108,7 @@ export async function startRecorder({sessionId,windowId,sourceTabId}){
   await put(state);return state;
 }
 export async function stopRecorder(){const state=await current();if(!state)throw new Error('No browsing session is recording.');return finish(state,'user_stopped');}
-export async function retryRecorder(){const state=await recorderState();if(!state)return null;await flush(state);if(state.status==='save_error'){state.status='stopped';state.error=null;await put(state);}return state;}
+export async function retryRecorder(){const state=await recorderState();if(!state)return null;try{await flush(state);if(state.status==='save_error'){state.status='stopped';state.error=null;await put(state);}return state;}catch(e){await fail(state,e);throw e;}}
 async function scopedTab(state,tabId){const tab=await chrome.tabs.get(tabId).catch(()=>null);return tab?.windowId===state.window_id && !tab.incognito?tab:null;}
 export async function recordTabActivated(tabId,windowId,receivedSession){
   const state=await current();if(!state || state.session_id!==receivedSession || windowId!==state.window_id)return;
