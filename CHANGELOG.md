@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — start from the current page, 27.10.2026
+
+- Start no longer initializes every pre-existing tab as Initial page. It queries only the selected window's active tab and records at most one initial HTTP(S) page; workspace mode can use its already-displayed same-window source. No background tab is activated or reloaded.
+- Subsequent activation of an existing HTTP(S) tab records Tab visited. Other-window activations stay excluded; repeated activation of the same tracked page is suppressed. Navigation updates the active-tab context so returning from a newly opened tab is handled correctly.
+- Bind navigation/activation callbacks to their session at receipt, so delayed pre-start events cannot enter a later recording. Restore that ingress binding on ordinary worker wake without relying on cross-process clock comparisons.
+- Existing history files are unchanged. No new permissions, dependencies or incompatible schema changes.
+
 ## 0.5.1 — compact lossless captures and bounded caches, 27.10.2026
 
 - Default Compact screenshot storage: retain one full-resolution PNG, omit duplicate intermediate viewport files. PNG + source frames remains selectable for independently reconstructing the stitch. Each capture records its retention policy; no old originals are deleted or recompressed.

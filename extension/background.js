@@ -1,16 +1,20 @@
 import {enqueue,handleContextMenu} from './context-actions.js';
-import {serializeRecorder,initializeRecorder,startRecorder,stopRecorder,retryRecorder,recordNavigation,recordTabEntered,recordTabLeft,recordTitle,recordLinkTarget,recordWindowClosed} from './session-recorder.js';
-const recorderReady=serializeRecorder(initializeRecorder);
+import {serializeRecorder,initializeRecorder,recorderIngress,startRecorder,stopRecorder,retryRecorder,recordNavigation,recordTabEntered,recordTabLeft,recordTabActivated,recordTitle,recordLinkTarget,recordWindowClosed} from './session-recorder.js';
+let recorderInitialized=false;
+const recorderReady=serializeRecorder(initializeRecorder).then(()=>{recorderInitialized=true;});
 const recorderTask=task=>recorderReady.then(()=>serializeRecorder(task));
 const observe=task=>{recorderTask(task).catch(e=>console.warn('TraceVault session:',e.message));};
 // Resolve membership before waiting for disk. A navigation from an outside
 // window must not become eligible just because its tab is moved in later.
 const moves=new Map();
 function navigation(kind,d){
-  if(d.frameId!==0)return;
+  if(d.frameId!==0 || (recorderInitialized && !recorderIngress()))return;
+  // On worker wake, bind this receipt to the restored session. On a running
+  // worker, capture the ID now, before tabs.get or any disk queue can delay it.
+  const session=recorderInitialized?Promise.resolve(recorderIngress()):recorderReady.then(recorderIngress);
   const revision=moves.get(d.tabId),observedAt=new Date().toISOString();
-  chrome.tabs.get(d.tabId).then(tab=>{
-    if(!tab.incognito && moves.get(d.tabId)===revision)observe(()=>recordNavigation(kind,{...d,observedWindowId:tab.windowId,observedAt}));
+  Promise.all([session,chrome.tabs.get(d.tabId)]).then(([receivedSession,tab])=>{
+    if(receivedSession && !tab.incognito && moves.get(d.tabId)===revision)observe(()=>recordNavigation(kind,{...d,observedWindowId:tab.windowId,observedAt,receivedSession}));
   }).catch(()=>{});
 }
 chrome.webNavigation.onCommitted.addListener(d=>navigation('navigation',d));
@@ -18,6 +22,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(d=>navigation('history_st
 chrome.webNavigation.onReferenceFragmentUpdated.addListener(d=>navigation('fragment',d));
 chrome.webNavigation.onCreatedNavigationTarget.addListener(d=>observe(()=>recordLinkTarget(d)));
 chrome.tabs.onCreated.addListener(tab=>observe(()=>recordTabEntered(tab.id,tab.windowId,'created')));
+chrome.tabs.onActivated.addListener(info=>{const session=recorderInitialized?Promise.resolve(recorderIngress()):recorderReady.then(recorderIngress);session.then(id=>{if(id)observe(()=>recordTabActivated(info.tabId,info.windowId,id));}).catch(()=>{});});
 chrome.tabs.onAttached.addListener((id,info)=>{moves.set(id,(moves.get(id)||0)+1);observe(()=>recordTabEntered(id,info.newWindowId,'moved_in'));});
 chrome.tabs.onDetached.addListener((id,info)=>{moves.set(id,(moves.get(id)||0)+1);observe(()=>recordTabLeft(id,info.oldWindowId,'moved_out'));});
 chrome.tabs.onRemoved.addListener((id,info)=>{moves.delete(id);if(!info.isWindowClosing)observe(()=>recordTabLeft(id,info.windowId,'closed'));});

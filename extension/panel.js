@@ -24,7 +24,7 @@ function switchView(next){
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt',folderLabel='';
 let navigationState=null,recorderBusy=false,ownWindowId=null,sessionRefreshTimer;
-const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Navigation',history_state:'Page state changed',fragment:'Page fragment changed',tab_entered:'Tab entered',tab_left:'Tab left',page_title:'Page title',link_target:'Linked tab'};
+const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Navigation',history_state:'Page state changed',fragment:'Page fragment changed',tab_entered:'Tab entered',tab_left:'Tab left',tab_activated:'Tab visited',page_title:'Page title',link_target:'Linked tab'};
 function selectedSessionId(){return navigationState?.case_id===activeCase && navigationState.workspace_id===workspace?.workspace_id?navigationState.session_id:[...state.audit].reverse().find(e=>e.action==='navigation_recorded')?.details.session_id;}
 function renderSession(){
   const ready=!!(root && workspace && activeCase),active=['starting','recording','stopping'].includes(navigationState?.status),pendingCount=navigationState?.pending?.length || 0,id=selectedSessionId();
@@ -401,7 +401,7 @@ action('session-start',async()=>{
   try{
     await canWrite();const c=context(),id=uuid(),window=await chrome.windows.getCurrent(),info=cases.find(item=>item.case_id===c.caseId);
     await setting('session-target:'+id,{...c,caseLabel:info.code+' · '+info.title});
-    await sessionCommand('TV_SESSION_START',{sessionId:id,windowId:window.id});status('Recording this window. URLs and titles only.');await refresh();
+    const source=await currentTab();await sessionCommand('TV_SESSION_START',{sessionId:id,windowId:window.id,sourceTabId:source?.id});status('Recording this window. URLs and titles only.');await refresh();
   }finally{recorderBusy=false;renderSession();}
 });
 action('session-stop',async()=>{await sessionCommand('TV_SESSION_STOP');status('Session stopped and saved.');await refresh();});
