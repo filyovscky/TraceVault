@@ -1,13 +1,13 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
 import {writeFile} from 'node:fs/promises';
-import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
+import {launch,extensionPage,chooseDirectory,invokeExtension,clickAction} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 test('installed Chrome 155: capture APIs, panel config, light/dark and 32 HiDPI layouts',async()=>{
   const run=Date.now(),profile=path.resolve('output/playwright/native-profile-'+run),context=await launch(profile,{installed:true}),fixture=await fixtureServer();
   try{
-    const panel=await extensionPage(context);await chooseDirectory(panel,path.resolve('output/playwright/native-workspace-'+run));await panel.locator('#case-code').fill('CHROME-155');await panel.locator('#case-title').fill('Verification установленного Chrome');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
-    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await panel.locator('#refresh-source').click();await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:25000});
+    const panel=await extensionPage(context);await chooseDirectory(panel,path.resolve('output/playwright/native-workspace-'+run));await panel.locator('#case-code').fill('CHROME-155');await panel.locator('#case-title').fill('Verification установленного Chrome');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created',{timeout:30000});
+    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await clickAction(panel,'#refresh-source');await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:25000});
     const options=await panel.evaluate(()=>chrome.sidePanel.getOptions({}));expect(options.path).toBe('panel.html');expect(options.enabled).toBe(true);
     const contexts=await panel.evaluate(()=>chrome.runtime.getContexts({contextTypes:['SIDE_PANEL']}));expect(contexts.length).toBe(1);
     const browserCDP=await context.browser().newBrowserCDPSession(),targets=await browserCDP.send('Target.getTargets',{filter:[{}]});

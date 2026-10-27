@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+0.6.0 Focus: [light, 320 px](0.6.0-focus-light-320.png), [dark, 420 px](0.6.0-focus-dark-420.png) and [case menu, 320 px](0.6.0-focus-menu-320.png). Actual extension document in installed Chrome after real HTML/PNG/highlight/export operations. Both browsers cover 320/360/420/520 px in both themes, collection counts/details/back navigation and native action-menu bounds. Native side-panel attachment and the full Windows DPI matrix were not rerun for this iteration.
+
 0.5.3: actual installed Chrome at 320 px, [light URL hover](0.5.3-url-installed-light.png) / [dark URL hover](0.5.3-url-installed-dark.png). The address keeps its beginning/end on one line; the full encoded URL is in a scrollable tooltip. Focused browser/data-integrity coverage and incomplete broader smoke coverage are distinguished in TEST-REPORT.md.
 
 0.5.1: [Compact storage Settings, installed Chrome](0.5.1-storage-settings-installed.png), [CFT](0.5.1-storage-settings-cft.png), [dark Settings](0.5.1-storage-settings-dark.png). Actual [compact PDF first page](0.5.1-compact-pdf-installed-1.png) and [last page](0.5.1-compact-pdf-installed-2.png) rendered independently; [PNG/PDF pixel verification](0.5.1-independent-pixels.json), [codec](0.5.1-png-codec.json), [whole-browser private-memory sample](0.5.1-capture-memory.json), full disk metadata [CFT](0.5.1-compact-cft.json) / [installed Chrome](0.5.1-compact-installed.json). Measurements are scoped in PERFORMANCE.md; screenshots are actual test artifacts, not design mockups.

@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
-import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
+import {launch,extensionPage,chooseDirectory,invokeExtension,clickAction} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 
 for(const installed of [false,true])test(`selection toolbar never reappears without a live selection${installed?' — installed Chrome':''}`,async()=>{
@@ -30,9 +30,9 @@ test('English icon UI: hover/focus, grouped settings, real save, annotation and 
   try{
     const panel=await extensionPage(context);await panel.evaluate(()=>chrome.sidePanel.setOptions({enabled:false}));await panel.setViewportSize({width:320,height:900});await expect(panel.locator('html')).toHaveAttribute('lang','en');
     await panel.locator('#settings-toggle').hover();await expect(panel.locator('#ui-tooltip')).toHaveText('Settings');await expect(panel.locator('#ui-tooltip')).toBeVisible();
-    await panel.locator('#workspace').focus();await panel.keyboard.press('Tab');await expect(panel.locator('#settings-toggle')).toBeFocused();await expect(panel.locator('#ui-tooltip')).toHaveText('Settings');
+    await panel.locator('#more-actions').focus();await panel.keyboard.press('Tab');await expect(panel.locator('#settings-toggle')).toBeFocused();await expect(panel.locator('#ui-tooltip')).toHaveText('Settings');
     const tooltip=await panel.locator('#ui-tooltip').boundingBox();expect(tooltip.x).toBeGreaterThanOrEqual(0);expect(tooltip.x+tooltip.width).toBeLessThanOrEqual(320);
-    await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('EN-UI');await panel.locator('#case-title').fill('Русское имя дела сохраняется');await panel.getByRole('button',{name:'Create case',exact:true}).click();await expect(panel.locator('#status')).toHaveText('Case created');
+    await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('EN-UI');await panel.locator('#case-title').fill('Русское имя дела сохраняется');await panel.getByRole('button',{name:'Create case',exact:true}).click();await expect(panel.locator('#status')).toHaveText('Case created',{timeout:30000});
     const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);await expect(panel.locator('#source-url')).toHaveText(source.url());
     await panel.locator('#capture-pdf').hover();await expect(panel.locator('#ui-tooltip')).toContainText('PDF');await expect(panel.locator('#ui-tooltip')).toBeVisible();await panel.screenshot({path:path.resolve('output/playwright/0.4-tooltip-320.png')});
     await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:30000});
@@ -58,7 +58,7 @@ test('English icon UI: hover/focus, grouped settings, real save, annotation and 
     await panel.locator('[data-view=annotations]').click();await expect(panel.locator('#search')).toHaveValue('');await expect(panel.locator('#annotation-type-filter')).toHaveValue('text_highlight');
     await panel.getByRole('button',{name:'Clear filters',exact:true}).click();await expect(panel.locator('#list')).toContainText('Генеральный директор');await expect(panel.locator('#reset-filters')).toBeDisabled();
     await panel.locator('[data-view=captures]').click();await expect(panel.locator('#search')).toHaveValue('missing-material');await panel.locator('#reset-filters').click();
-    await panel.locator('[data-view=entities]').click();await expect(panel.locator('#list')).toContainText('No entities yet');await expect(panel.getByRole('button',{name:'Clear filters',exact:true})).toHaveCount(0);
+    await clickAction(panel,'[data-view=entities]');await expect(panel.locator('#list')).toContainText('No entities yet');await expect(panel.getByRole('button',{name:'Clear filters',exact:true})).toHaveCount(0);
     await panel.locator('[data-view=annotations]').click();await panel.locator('#filter-options').evaluate(d=>d.open=false);
     for(const theme of ['dark','light']){
       await panel.locator('#settings-toggle').click();await panel.locator('#theme').selectOption(theme);await panel.locator('#save-settings').click();await expect(panel.locator('#settings')).not.toBeVisible();

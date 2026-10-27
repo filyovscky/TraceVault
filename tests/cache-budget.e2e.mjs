@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
-import {launch,extensionPage,chooseDirectory} from './browser-helpers.mjs';
+import {launch,extensionPage,chooseDirectory,clickAction} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 
 test('journal cache stays bounded while replay preserves every event and detects corruption',async()=>{
@@ -22,9 +22,9 @@ test('annotation cache keeps one case and restores the earlier highlight from di
   const run=Date.now(),context=await launch(path.resolve('output/playwright/annotation-cache-profile-'+run)),fixture=await fixtureServer();
   try{
     const panel=await extensionPage(context);await chooseDirectory(panel,path.resolve('output/playwright/annotation-cache-workspace-'+run));await panel.locator('#case-title').fill('First case');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();const first=await panel.locator('#case-select').inputValue();
-    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await source.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('p'));getSelection().removeAllRanges();getSelection().addRange(range);});await panel.locator('#selection-highlight').click();await expect(panel.locator('#status')).toContainText('Highlight saved');
+    const source=await context.newPage();await source.goto(fixture.url+'/static');await source.bringToFront();await source.evaluate(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('p'));getSelection().removeAllRanges();getSelection().addRange(range);});await clickAction(panel,'#selection-highlight');await expect(panel.locator('#status')).toContainText('Highlight saved');
     const count=()=>source.evaluate(()=>CSS.highlights.get('tracevault-amber')?.size || 0),keys=()=>panel.evaluate(async()=>Object.keys((await chrome.storage.local.get('annotationCache')).annotationCache));await expect.poll(count).toBe(1);
-    await panel.locator('#new-case').click();await panel.locator('#case-title').fill('Second case');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();const second=await panel.locator('#case-select').inputValue();await expect.poll(keys).toEqual([second]);await expect.poll(count).toBe(0);
+    await clickAction(panel,'#new-case');await panel.locator('#case-title').fill('Second case');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();const second=await panel.locator('#case-select').inputValue();await expect.poll(keys).toEqual([second]);await expect.poll(count).toBe(0);
     await panel.locator('#case-select').selectOption(first);await expect.poll(keys).toEqual([first]);await expect.poll(count).toBe(1);await source.reload();await expect.poll(count).toBe(1);
   }finally{await context.close();fixture.server.close();}
 });

@@ -5,7 +5,7 @@ const paths={
   settings:'m10 3-.6 2.2-2 .8-2-.8-2 3.5L5 10v2l-1.6 1.3 2 3.5 2-.8 2 .8.6 2.2h4l.6-2.2 2-.8 2 .8 2-3.5L19 12v-2l1.6-1.3-2-3.5-2 .8-2-.8L14 3zM15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   folder:'M3 7V5h6l2 2h10v13H3zM3 10h18',
   key:'M14 9a5 5 0 1 1-3-4 5 5 0 0 1 3 4zM13 12l8 8m-2-2 2-2m-5-1 2-2',
-  plus:'M12 5v14M5 12h14',refresh:'M20 10a8 8 0 1 0-1 7M20 4v6h-6',
+  plus:'M12 5v14M5 12h14',more:'M6 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0M13 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0M20 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0',down:'m6 9 6 6 6-6',refresh:'M20 10a8 8 0 1 0-1 7M20 4v6h-6',
   shield:'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6zM8 12l3 3 5-6',
   html:'M14 3H5v18h14V8zM14 3v5h5M10 11l-3 3 3 3m4-6 3 3-3 3',
   camera:'M3 7h4l2-3h6l2 3h4v13H3zM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
@@ -46,7 +46,7 @@ export function initControls(){
   function hide(){tip.hidden=true;owner?.removeAttribute('aria-describedby');owner=null;}
   function show(button){
     if(!button?.dataset.tooltip)return;hide();owner=button;
-    (button.closest('dialog') || document.body).append(tip);tip.classList.toggle('url-tooltip',button.hasAttribute('data-full-url'));tip.textContent=button.dataset.tooltip+(button.disabled?' (unavailable)':'');tip.hidden=false;button.setAttribute('aria-describedby',tip.id);
+    (button.closest('dialog,[popover]') || document.body).append(tip);tip.classList.toggle('url-tooltip',button.hasAttribute('data-full-url'));tip.textContent=button.dataset.tooltip+(button.disabled?' (unavailable)':'');tip.hidden=false;button.setAttribute('aria-describedby',tip.id);
     const rect=button.getBoundingClientRect(),width=tip.offsetWidth,height=tip.offsetHeight;
     tip.style.left=Math.max(8,Math.min(innerWidth-width-8,rect.left+(rect.width-width)/2))+'px';
     const gap=button.hasAttribute('data-full-url')?-1:6;tip.style.top=(rect.bottom+height+8<=innerHeight?rect.bottom+gap:Math.max(8,rect.top-height-gap))+'px';

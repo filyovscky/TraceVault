@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — Focus interface, 28.10.2026
+
+- Compact case picker and current-page block, one labelled Save page action, full-page PNG/PDF icons and a disclosure for visible-area PNG, refresh and capture notes.
+- Materials / Highlights / History text tabs with actual record counts. Entities, case export, new case, selected-text tools, folder, workspace tab and Commands move to Case actions. Existing commands, context menus and shortcuts remain available.
+- Collection details replace the list while open; back or a section tab returns to the list. Search retains independent section filters; Current page only moves inside Filters, whose active count remains visible.
+- Fixed bottom Window history controls show Start or Stop according to real state. Session actions holds its journal/export; save failures, pending counts and Retry remain visible.
+- Native popovers dismiss on Escape/outside interaction and before running actions, preserving picker activation. No data/schema, permission, dependency or primary-file changes.
+
 ## 0.5.5 — separate development integrations, 27.10.2026
 
 - Remove external-integration claims from current documentation, comparison and entity details. Describe case JSON export as TraceVault's own interchange format.

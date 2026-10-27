@@ -3,7 +3,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {mkdir,writeFile,stat} from 'node:fs/promises';
-import {launch,extensionPage,chooseDirectory} from './browser-helpers.mjs';
+import {launch,extensionPage,chooseDirectory,clickAction} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 const execute=promisify(execFile);
 
@@ -26,7 +26,7 @@ while(-not (Test-Path -LiteralPath $taskStop)) {
     try{
       const panel=await extensionPage(context);await chooseDirectory(panel,path.join(out,'workspace-'+version));await panel.locator('#case-title').fill('Memory benchmark');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();await panel.evaluate(()=>chrome.sidePanel.setOptions({enabled:false}));
       const source=await context.newPage(),cdp=await context.newCDPSession(source),{windowId}=await cdp.send('Browser.getWindowForTarget');await cdp.send('Browser.setWindowBounds',{windowId,bounds:{width:1400,height:950}});await source.goto(fixture.url+'/long');
-      await source.evaluate(()=>{document.body.innerHTML='<main>RAM benchmark: fine text 0123456789</main>';document.body.style.cssText='margin:0;width:1600px;height:8000px;background:repeating-linear-gradient(#f6f6f6 0 50px,#ddd 50px 100px);font:12px sans-serif';});await source.bringToFront();await panel.locator('#refresh-source').click();
+      await source.evaluate(()=>{document.body.innerHTML='<main>RAM benchmark: fine text 0123456789</main>';document.body.style.cssText='margin:0;width:1600px;height:8000px;background:repeating-linear-gradient(#f6f6f6 0 50px,#ddd 50px 100px);font:12px sans-serif';});await source.bringToFront();await clickAction(panel,'#refresh-source');
       const browser=await context.browser().newBrowserCDPSession(),before=await browser.send('SystemInfo.getProcessInfo'),ids=before.processInfo.map(p=>p.id).join(',');stop=path.join(out,'stop-'+version);const ready=path.join(out,'ready-'+version);
       sampling=execute('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',sampler,ids,stop,ready]);await expect.poll(async()=>!!await stat(ready).catch(()=>null)).toBe(true);
       const start=performance.now();await panel.locator('#capture-full').click();await expect(panel.locator('#status')).toContainText('EVD-000001',{timeout:120000});const ms=performance.now()-start;

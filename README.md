@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.5.5](releases/TraceVault-0.5.5.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.6.0](releases/TraceVault-0.6.0.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.5. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.5.5 add no permissions.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.6.0. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.6.0 add no permissions.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** before creating a case; existing files stay in the original folder.
 
@@ -18,15 +18,17 @@ Hover an icon or focus it with the keyboard to see its English description. Icon
 
 Long URL displays keep their beginning and ending on one line, with a middle ellipsis when space is limited. Hover the URL to read the full address; Current page and URL fields also support keyboard focus. Very long tooltips can scroll. Saved source values, searches, link destinations, citations and exports keep the complete URL; clipping is visual CSS only.
 
-| Group | Icons, left to right |
+| Location | Actions |
 | --- | --- |
-| Header | Commands, open workspace tab, settings |
-| Capture | HTML document, visible-area camera, full-page PNG scan, PDF document |
-| Annotate selection | Highlight, quote, note, entity |
-| Browsing session | Start this window, Stop, journal, export JSON |
-| Case sections | Materials, Highlights, Entities, History (visible names) |
+| Header | Case actions menu, Settings |
+| Current page | **Save page** (HTML), full-page PNG, PDF; more capture options for visible-area PNG, refresh and capture notes |
+| Case sections | Materials, Highlights, History; counts show saved records before filtering |
+| Case actions menu | New case, Entities, export JSON, selected-text tools, Commands, workspace tab and folder |
+| Bottom bar | Start/Stop window history; session journal and JSON export in Session actions |
 
-The active section has a labelled heading and an underlined icon. **Highlights** lists highlights, quotes and notes, with separate counts and a type filter. Search and filters are remembered separately for each section while the panel is open; Reset filters clears the current section. Empty lists distinguish missing records from filtered-out records and offer guidance or Clear filters. A free note is available in Highlights. Record details provide preview, checksum verification, copy, export and other relevant actions; each has a tooltip.
+The case picker sits directly below the header. **Highlights** lists highlights, quotes and notes, with separate counts and a type filter. Search and filters are remembered separately for each section while the panel is open. Filters holds Current page only, type/status/domain/date; its active count stays visible when collapsed. Reset filters clears the current section. Empty lists distinguish missing records from filtered-out records. The note icon in Highlights creates a free note. Opening a record replaces its collection list with details; the back arrow or any section tab returns to the list. Source capture tools stay available. Preview, checksum verification, copy and original export remain in record details.
+
+Select text on the website and use its context menu or selection toolbar for immediate annotation. The same actions remain in Case actions → Selected text. **Entities** is in Case actions; choosing it opens its collection with a visible heading. Menus support Tab, Escape and outside-click dismissal. Ctrl+Shift+Space opens Commands directly.
 
 Settings has five groups: **Appearance, Capture, Annotations, Keyboard shortcuts, Storage**. Use the checkmark to apply preferences. Closing the dialog discards unapplied theme/pause/size/global-visibility changes. The per-site visibility icon is an immediate action. Shortcut settings display actual Chrome assignments; unassigned internal browser actions are omitted.
 
@@ -67,13 +69,13 @@ Highlight selection saves immediately without opening an editor; the note is opt
 
 ## Record one window
 
-Connect a case, then press the circle in **Browsing session**. Start records only the current HTTP(S) page as **Initial page**, not the list of already-open tabs. It neither activates nor reloads background tabs. When using the workspace tab, the source already shown under Current page may be used if it is still in the same window. Switching to an existing HTTP(S) tab later records **Tab visited**; subsequent navigations, SPA/hash changes, tab entry/exit and browser-provided linked-tab relationships are recorded normally. If there is no current HTTP(S) source, Start writes only the session-start event and waits for activity.
+Connect a case, then press the circle in the bottom **Window history** bar. Start records only the current HTTP(S) page as **Initial page**, not the list of already-open tabs. It neither activates nor reloads background tabs. When using the workspace tab, the source already shown under Current page may be used if it is still in the same window. Switching to an existing HTTP(S) tab later records **Tab visited**; subsequent navigations, SPA/hash changes, tab entry/exit and browser-provided linked-tab relationships are recorded normally. If there is no current HTTP(S) source, Start writes only the session-start event and waits for activity.
 
 The session stays pinned to that window and case, even when you switch cases or close the panel. Future activity in that window's tabs participates; other windows do not. A tab moved out stops contributing; moving it in records its current page and resumes tracking. Existing annotation functionality remains independent of this recording scope.
 
 Stop with the square. Closing the selected window also stops the session. After a browser/extension restart it ends explicitly; no other window is silently adopted. Saving **Pause all capture** also stops recording. Start remains disabled until you resume.
 
-The history icon filters **History** to the session; event details offer the URL, times, original metadata and checksum verification. The export icon writes a real JSON file into the case's `exports` directory after re-verifying source event files. Each event is a separate verified JSON under `sessions/<session UUID>/`, referenced from the case's ordinary audit journal. A write error stops collection and exposes pending events with **Retry saving pending events**; reconnect the original workspace before retrying. From 0.5.4, retry also recovers older files whose JSON keys were reordered by browser storage, preserving the original file and its actual checksum. Interrupted empty/truncated files are retained alongside the recovered event; conflicting event data or committed checksum failures require review. Retry finishes the failed session; press Start explicitly for a new recording.
+**Session actions → Open session journal** filters **History** to the session; event details offer the URL, times, original metadata and checksum verification. **Session actions → Export saved session as JSON** writes a real JSON file into the case's `exports` directory after re-verifying source event files. Each event is a separate verified JSON under `sessions/<session UUID>/`, referenced from the case's ordinary audit journal. A write error stops collection and exposes pending events with **Retry saving pending events**; reconnect the original workspace before retrying. From 0.5.4, retry also recovers older files whose JSON keys were reordered by browser storage, preserving the original file and its actual checksum. Interrupted empty/truncated files are retained alongside the recovered event; conflicting event data or committed checksum failures require review. Retry finishes the failed session; press Start explicitly for a new recording.
 
 This records a browsing trail, **not page contents**. Use HTML/PNG/PDF capture to preserve the page itself. It does not reconstruct pre-session history, every redirect hop, failed navigation or user input. System time is not an independent timestamp. Sudden process/disk failure may lose browser callbacks that have not reached persistent pending storage; it is not a lossless forensic network recorder. One active session is supported. See [architecture and limits](docs/SESSION-RECORDING.md), [measured performance](docs/PERFORMANCE.md) and [comparison with adjacent tools](docs/COMPARISON.md).
 

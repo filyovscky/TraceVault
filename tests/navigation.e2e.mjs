@@ -3,7 +3,7 @@ import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import http from 'node:http';
-import {launch,extensionPage,chooseDirectory,invokeExtension} from './browser-helpers.mjs';
+import {launch,extensionPage,chooseDirectory,invokeExtension,clickAction} from './browser-helpers.mjs';
 import {fixtureServer} from './fixture-server.mjs';
 
 for(const installed of [false,true])test(`default all-site access: HTML, PNG and CORS across origins without action invocation${installed?' — installed Chrome':''}`,async()=>{
@@ -18,13 +18,13 @@ for(const installed of [false,true])test(`default all-site access: HTML, PNG and
     await expect(panel.locator('#site-state')).toHaveText('Site access enabled');await expect(panel.locator('#grant-site')).not.toBeVisible();
     const publicUrl=`http://localhost:${publicServer.address().port}`;
     await source.evaluate(url=>{document.querySelectorAll('link,style').forEach(n=>n.remove());const link=document.createElement('link');link.rel='stylesheet';link.href=url+'/public.css';document.head.append(link);},publicUrl);
-    await panel.locator('#refresh-source').click();await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:30000});
+    await clickAction(panel,'#refresh-source');await panel.locator('#capture-page').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000001',{timeout:30000});
     const record=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures)[0];});
     expect(record.warnings).toEqual([]);const bytes=await readFile(path.join(directory,record.artifacts[0].relative_path));expect(createHash('sha256').update(bytes).digest('hex')).toBe(record.artifacts[0].sha256);expect(bytes.toString()).toContain('--cors-proof:42');expect(bytes.toString()).toContain('data:image/svg+xml;base64,');
     expect(requests.some(r=>r.url==='/public.css')).toBe(true);expect(errors.filter(e=>/CORS|Cannot access contents/u.test(e))).toEqual([]);
     // A new origin revokes activeTab, and this test never invokes the action at all.
     await source.goto(fixture.url.replace('127.0.0.1','localhost')+'/second-site');await source.bringToFront();await expect(panel.locator('#source-url')).toHaveText(source.url());await expect(panel.locator('#site-state')).toHaveText('Site access enabled');
-    await panel.locator('#capture-screen').click();await expect(panel.locator('#status')).toContainText('Saved · EVD-000002',{timeout:30000});
+    await clickAction(panel,'#capture-screen');await expect(panel.locator('#status')).toContainText('Saved · EVD-000002',{timeout:30000});
     const screen=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return Object.values((await s.exclusive(()=>r.loadState(root,w,id))).captures).find(c=>c.evidence_number==='EVD-000002');});
     expect(screen.kind).toBe('screenshot');expect(screen.source.final_url).toBe(source.url());const png=await readFile(path.join(directory,screen.artifacts[0].relative_path));expect(createHash('sha256').update(png).digest('hex')).toBe(screen.artifacts[0].sha256);expect(png.subarray(1,4).toString()).toBe('PNG');expect(await panel.evaluate(()=>window.__permissionRequests)).toEqual([]);expect(errors).toEqual([]);
     await source.goto(fixture.url+'/icon.svg');await expect.poll(()=>source.evaluate(()=>document.contentType)).toBe('image/svg+xml');expect(sourceErrors).toEqual([]);
@@ -48,7 +48,7 @@ for(const installed of [false,true])test(`current page follows navigation, SPA a
 test('legacy exclusions disappear; expired folder access reconnects on save and writes verified files',async()=>{
   test.setTimeout(90000);const run=Date.now(),directory=path.resolve('output/playwright/access-workspace-'+run),context=await launch(path.resolve('output/playwright/access-profile-'+run)),fixture=await fixtureServer();
   try{
-    const panel=await extensionPage(context);await panel.evaluate(async()=>{const s=await import('./storage.js');await s.setting('preferences',{theme:'dark',blockedDomains:['127.0.0.1','google.com'],allowedCaptureHosts:['gmail.com']});});await panel.reload();await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('ACCESS');await panel.locator('#case-title').fill('Folder recovery');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
+    const panel=await extensionPage(context);await panel.evaluate(async()=>{const s=await import('./storage.js');await s.setting('preferences',{theme:'dark',blockedDomains:['127.0.0.1','google.com'],allowedCaptureHosts:['gmail.com']});});await panel.reload();await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('ACCESS');await panel.locator('#case-title').fill('Folder recovery');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created',{timeout:30000});
     const id=await panel.evaluate(async()=>{const s=await import('./storage.js');return s.setting('activeCase');});const preferences=await panel.evaluate(async()=>{const s=await import('./storage.js');return s.setting('preferences');});expect(preferences).toEqual({theme:'dark'});await expect(panel.locator('#blocked-domains,#allowed-capture-hosts,#capture-exclusion')).toHaveCount(0);
     const source=await context.newPage();await source.goto(fixture.url+'/before');await source.bringToFront();await invokeExtension(context,source,new URL(panel.url()).host);
     // Fault injection models permission expiration, not the native permission bubble.

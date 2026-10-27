@@ -39,6 +39,13 @@ export async function chooseDirectory(page,directory,{button='pick-root',timeout
   for(const type of ['dragEnter','drop'])await cdp.send('Input.dispatchDragEvent',{type,x:100,y:150,data:{items:[],files:[directory],dragOperationsMask:1}});
   await expect.poll(()=>page.evaluate(()=>window.__qaDirectory?.kind)).toBe('directory');
   await page.evaluate(()=>{window.showDirectoryPicker=async()=>{await window.__qaDirectory.requestPermission({mode:'readwrite'});return window.__qaDirectory;};});
-  await page.locator('#'+button).click();
+  await clickAction(page,'#'+button);
   await expect(page.locator('#folder-state')).toContainText('Read/write access',{timeout});
+}
+// Follow the same disclosure controls as a user; no forced or synthetic clicks.
+export async function clickAction(page,selector){
+  const control=page.locator(selector);
+  const menu=await control.evaluate(node=>node.closest('[popover]')?.id || null);
+  if(menu && !await control.isVisible())await page.locator(`[popovertarget="${menu}"]`).click();
+  await control.click();
 }
