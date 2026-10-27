@@ -69,12 +69,13 @@ export async function probe(root) {
   await writeNew(root,path,content,'text/plain');
   await root.removeEntry(path);
 }
-export async function openWorkspace(root, mode='workspace') {
+export async function openWorkspace(root, mode='workspace',{persist=true}={}) {
+  if(!['workspace','single_case'].includes(mode))throw new Error('Unknown workspace layout');
   await probe(root);
   let metadata;
   if (await exists(root,'workspace.json')) {
     metadata = await readJSON(root,'workspace.json');
-    if (metadata.schema_version !== 1 || !['workspace','single_case'].includes(metadata.mode)) throw new Error("Unknown workspace schema");
+    if (!metadata || metadata.schema_version !== 1 || !['workspace','single_case'].includes(metadata.mode)) throw new Error("Invalid workspace.json. Choose another folder or restore its metadata from a backup.");
   } else {
     // Do not silently adopt another application's populated directory.
     const entries = []; for await (const [name] of root.entries()) entries.push(name);
@@ -82,7 +83,7 @@ export async function openWorkspace(root, mode='workspace') {
     metadata = {schema_version:1, workspace_id:uuid(), mode, created_at:now()};
     await writeNew(root,'workspace.json',metadata);
   }
-  await setting('root',root);
+  if(persist)await setting('root',root);
   return metadata;
 }
 export const exclusive = fn => navigator.locks.request('tracevault-disk-writer',fn);

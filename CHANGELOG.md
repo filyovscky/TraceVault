@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6 — guarded workspace setup, 27.10.2026
+
+- Fix null-workspace case operations: a remembered folder handle no longer enables case creation before workspace metadata is connected. Repository path/list/create operations validate the workspace mode before any disk access. Invalid/null workspace.json reports a recovery message instead of a property-access exception.
+- Guided Folder → Case → Capture sequence, labelled first-case action, automatic editable case codes, explicit destination folder and a Ready summary. Capture/annotation/export actions stay disabled until a case is connected; collections are hidden during setup. Lost access has a labelled Restore folder access action.
+- Connection and case creation have separate in-progress guards; duplicate form submissions create one case. Folder changes are pinned and persisted only after metadata, cases and recovery validate. A bad candidate preserves the connected folder. Reauthorization reopens existing cases; single-case mode hides the impossible second-case action.
+
 ## 0.4.5 — selection toolbar dismissal, 23.10.2026
 
 - Annotation rendering no longer opens the floating selection toolbar. Previously background refreshes, page mutations and capture cleanup could make an already-dismissed toolbar visible with no selection.

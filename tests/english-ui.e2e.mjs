@@ -28,7 +28,7 @@ for(const installed of [false,true])test(`selection toolbar never reappears with
 test('English icon UI: hover/focus, grouped settings, real save, annotation and preference persistence',async()=>{
   test.setTimeout(120000);const run=Date.now(),directory=path.resolve('output/playwright/english-workspace-'+run),context=await launch(path.resolve('output/playwright/english-profile-'+run)),fixture=await fixtureServer();
   try{
-    const panel=await extensionPage(context);await panel.setViewportSize({width:320,height:900});await expect(panel.locator('html')).toHaveAttribute('lang','en');
+    const panel=await extensionPage(context);await panel.evaluate(()=>chrome.sidePanel.setOptions({enabled:false}));await panel.setViewportSize({width:320,height:900});await expect(panel.locator('html')).toHaveAttribute('lang','en');
     await panel.locator('#settings-toggle').hover();await expect(panel.locator('#ui-tooltip')).toHaveText('Settings');await expect(panel.locator('#ui-tooltip')).toBeVisible();
     await panel.locator('#workspace').focus();await panel.keyboard.press('Tab');await expect(panel.locator('#settings-toggle')).toBeFocused();await expect(panel.locator('#ui-tooltip')).toHaveText('Settings');
     const tooltip=await panel.locator('#ui-tooltip').boundingBox();expect(tooltip.x).toBeGreaterThanOrEqual(0);expect(tooltip.x+tooltip.width).toBeLessThanOrEqual(320);

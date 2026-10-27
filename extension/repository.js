@@ -1,8 +1,12 @@
 import {directory, readJSON, exists, writeNew} from './storage.js';
 import {now, uuid, foldEvents, SCHEMA,clock} from './domain.js';
-export function casePath(workspace, id) { return workspace.mode === 'single_case' ? '' : `cases/${id}/`; }
+function workspaceMode(workspace){
+  if(!workspace || !['workspace','single_case'].includes(workspace.mode))throw new Error('Workspace is not connected. Choose or reconnect a workspace folder first.');
+  return workspace.mode;
+}
+export function casePath(workspace, id) { return workspaceMode(workspace) === 'single_case' ? '' : `cases/${id}/`; }
 export async function listCases(root, workspace) {
-  if (workspace.mode === 'single_case') return await exists(root,'case.json') ? [await readJSON(root,'case.json')] : [];
+  if (workspaceMode(workspace) === 'single_case') return await exists(root,'case.json') ? [await readJSON(root,'case.json')] : [];
   const result = [];
   try {
     const dir = await directory(root,['cases']);
@@ -15,8 +19,9 @@ export async function listCases(root, workspace) {
   return result;
 }
 export async function createCase(root, workspace, title, code) {
+  const mode=workspaceMode(workspace);
   if (!title.trim() || !code.trim()) throw new Error("Enter a case title and code");
-  if (workspace.mode === 'single_case' && (await listCases(root,workspace)).length) throw new Error("This folder supports only one case");
+  if (mode === 'single_case' && (await listCases(root,workspace)).length) throw new Error("This folder supports only one case");
   const c = {schema_version:1,case_id:uuid(),title:title.trim(),code:code.trim(),created_at:now()};
   await writeNew(root,casePath(workspace,c.case_id)+'case.json',c);
   await append(root,workspace,c.case_id,'case_created',null,c);

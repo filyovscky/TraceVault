@@ -17,3 +17,15 @@ nav button[aria-current]{background:var(--surface);font-weight:600}
 .empty button{width:auto}
 .setup-action button{width:100%;justify-content:flex-start}
 .setup-options{margin-top:8px}
+.setup-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;gap:8px;padding:0;margin:0 0 8px}
+.setup-steps li{display:flex;align-items:center;gap:6px;min-width:0;padding:6px 0;border-bottom:2px solid var(--border);color:var(--muted);font-size:12px}
+.setup-steps li span{font-variant-numeric:tabular-nums}
+.setup-steps li[aria-current]{color:var(--text);border-color:var(--accent);font-weight:600}
+.setup-steps li[data-complete=true]{color:var(--accent)}
+#setup-next,#workspace-hint{margin:8px 0 0}
+#reauthorize{width:100%;margin-bottom:8px}
+#case-target{overflow-wrap:anywhere}
+#case-dialog .dialog-actions{align-items:flex-start}
+#case-dialog .dialog-actions>span{font-size:11px}
+body.workspace #setup-progress{grid-column:1}
+body.workspace main:has(#collection[hidden]){display:block;max-width:520px}

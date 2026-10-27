@@ -1,4 +1,4 @@
-export const VERSION = '0.4.5';
+export const VERSION = '0.4.6';
 export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();

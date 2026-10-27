@@ -36,8 +36,8 @@ test('failure boundaries: size, cancellation, denied adapter, duplicates, case s
 test('single-case folder mode survives reconnect and refuses a second case',async()=>{
   const run=Date.now(),directory=path.resolve('output/playwright/single-workspace-'+run),context=await launch(path.resolve('output/playwright/single-profile-'+run));
   try{
-    const panel=await extensionPage(context);await panel.locator('#workspace-mode').selectOption('single_case');await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SINGLE');await panel.locator('#case-title').fill('Одна папка');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
+    const panel=await extensionPage(context);await panel.locator('.setup-options summary').click();await panel.locator('#workspace-mode').selectOption('single_case');await chooseDirectory(panel,directory);await panel.locator('#case-code').fill('SINGLE');await panel.locator('#case-title').fill('Одна папка');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toHaveText('Case created');
     expect(await readdir(directory)).toContain('case.json');expect(await readdir(directory)).not.toContain('cases');await panel.reload();await expect(panel.locator('#case-select')).toContainText('SINGLE');
-    await panel.locator('#new-case').click();await panel.locator('#case-code').fill('EXTRA');await panel.locator('#case-title').fill('Недопустимое дело');await panel.locator('#case-form button[type=submit]').click();await expect(panel.locator('#status')).toContainText('only one case');
+    await expect(panel.locator('#new-case')).not.toBeVisible();const error=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),workspace=await s.readJSON(root,'workspace.json');try{await s.exclusive(()=>r.createCase(root,workspace,'Extra','EXTRA'));return null;}catch(e){return e.message;}});expect(error).toContain('only one case');
   }finally{await context.close();}
 });

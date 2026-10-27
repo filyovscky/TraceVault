@@ -3,10 +3,19 @@ import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {planTiles} from '../extension/screenshot.js';
 import {resourceCredentials} from '../extension/capture.js';
+import {casePath,listCases,createCase} from '../extension/repository.js';
 import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from '../extension/domain.js';
 
 test('shipped UI, manifest and runtime messages are English; archived content is external data',async()=>{for(const file of (await readdir('extension')).filter(f=>/\.(js|html|json)$/u.test(f)))assert.doesNotMatch(await readFile('extension/'+file,'utf8'),/[А-Яа-яЁё]/u,file);});
 test('SHA-256 uses bytes and matches NIST abc vector',async()=>assert.equal(await sha256(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
+test('missing workspace metadata blocks case paths, listing and creation before any disk access',async()=>{
+  const root=new Proxy({},{get(){throw new Error('Unexpected disk access');}});
+  for(const workspace of [null,undefined,{}, {mode:'invalid'}]){
+    assert.throws(()=>casePath(workspace,'case'),/Workspace is not connected/u);
+    await assert.rejects(listCases(root,workspace),/Workspace is not connected/u);
+    await assert.rejects(createCase(root,workspace,'Case title','CASE-001'),/Workspace is not connected/u);
+  }
+});
 test('resource credentials keep source authentication and omit cross-origin cookies',()=>{
   assert.equal(resourceCredentials('https://site.test/private.png','https://site.test/page'),'include');
   for(const url of ['https://fonts.googleapis.com/css2?family=Inter','https://cdn.site.test/font.woff2','http://site.test/image','https://site.test:8443/image'])assert.equal(resourceCredentials(url,'https://site.test/page'),'omit');
