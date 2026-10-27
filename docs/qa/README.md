@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+0.5.3: actual installed Chrome at 320 px, [light URL hover](0.5.3-url-installed-light.png) / [dark URL hover](0.5.3-url-installed-dark.png). The address keeps its beginning/end on one line; the full encoded URL is in a scrollable tooltip. Focused browser/data-integrity coverage and incomplete broader smoke coverage are distinguished in TEST-REPORT.md.
+
 0.5.1: [Compact storage Settings, installed Chrome](0.5.1-storage-settings-installed.png), [CFT](0.5.1-storage-settings-cft.png), [dark Settings](0.5.1-storage-settings-dark.png). Actual [compact PDF first page](0.5.1-compact-pdf-installed-1.png) and [last page](0.5.1-compact-pdf-installed-2.png) rendered independently; [PNG/PDF pixel verification](0.5.1-independent-pixels.json), [codec](0.5.1-png-codec.json), [whole-browser private-memory sample](0.5.1-capture-memory.json), full disk metadata [CFT](0.5.1-compact-cft.json) / [installed Chrome](0.5.1-compact-installed.json). Measurements are scoped in PERFORMANCE.md; screenshots are actual test artifacts, not design mockups.
 
 0.5.0: real session recorder in the extension document, 320 px, [light](0.5.0-session-light.png) and [dark](0.5.0-session-dark.png). Real one-window/two-window, FSA/hash/export/restart scenarios are documented in TEST-REPORT.md. [Raw resource measurements before](0.5.0-session-performance-before.json) and [after](0.5.0-session-performance-after.json); these include the entire isolated browser where stated, not extension-only RSS.

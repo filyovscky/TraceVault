@@ -46,14 +46,15 @@ export function initControls(){
   function hide(){tip.hidden=true;owner?.removeAttribute('aria-describedby');owner=null;}
   function show(button){
     if(!button?.dataset.tooltip)return;hide();owner=button;
-    (button.closest('dialog') || document.body).append(tip);tip.textContent=button.dataset.tooltip+(button.disabled?' (unavailable)':'');tip.hidden=false;button.setAttribute('aria-describedby',tip.id);
+    (button.closest('dialog') || document.body).append(tip);tip.classList.toggle('url-tooltip',button.hasAttribute('data-full-url'));tip.textContent=button.dataset.tooltip+(button.disabled?' (unavailable)':'');tip.hidden=false;button.setAttribute('aria-describedby',tip.id);
     const rect=button.getBoundingClientRect(),width=tip.offsetWidth,height=tip.offsetHeight;
     tip.style.left=Math.max(8,Math.min(innerWidth-width-8,rect.left+(rect.width-width)/2))+'px';
-    tip.style.top=(rect.bottom+height+8<=innerHeight?rect.bottom+6:Math.max(8,rect.top-height-6))+'px';
+    const gap=button.hasAttribute('data-full-url')?-1:6;tip.style.top=(rect.bottom+height+8<=innerHeight?rect.bottom+gap:Math.max(8,rect.top-height-gap))+'px';
   }
-  document.addEventListener('pointerover',e=>{const b=e.target.closest('button');if(b && !b.contains(e.relatedTarget))show(b);});
-  document.addEventListener('pointerout',e=>{if(owner && !owner.contains(e.relatedTarget) && document.activeElement!==owner)hide();});
-  document.addEventListener('focusin',e=>{if(e.target.matches('button:focus-visible'))show(e.target);});
-  document.addEventListener('focusout',hide);document.addEventListener('pointerdown',hide);document.addEventListener('scroll',hide,true);window.addEventListener('resize',hide);
+  document.addEventListener('pointerover',e=>{const b=e.target.closest('[data-full-url],button');if(b && !b.contains(e.relatedTarget))show(b);});
+  document.addEventListener('pointerout',e=>{if(owner && !owner.contains(e.relatedTarget) && !tip.contains(e.relatedTarget) && document.activeElement!==owner)hide();});
+  document.addEventListener('focusin',e=>{if(e.target.matches('button:focus-visible,[data-full-url]:focus-visible'))show(e.target);});
+  document.addEventListener('focusout',hide);document.addEventListener('pointerdown',e=>{if(!tip.contains(e.target))hide();});document.addEventListener('scroll',e=>{if(e.target!==tip)hide();},true);window.addEventListener('resize',hide);
   document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',hide));
+  return {refreshTooltip(node){if(owner && !owner.isConnected)hide();else if(owner===node)show(node);},hideTooltip:hide};
 }

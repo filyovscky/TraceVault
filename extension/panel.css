@@ -31,3 +31,8 @@ body.workspace #setup-progress{grid-column:1}
 body.workspace main:has(#collection[hidden]){display:block;max-width:520px}
 body.workspace #session-section{grid-column:1}
 #session-section h2{margin-bottom:4px}#session-section>p{margin:6px 0 10px}#session-state{overflow-wrap:anywhere}
+.compact-url{display:flex;min-width:0;max-width:100%;overflow:hidden;white-space:nowrap;direction:ltr;text-align:left;unicode-bidi:isolate;overflow-wrap:normal;word-break:normal}
+.url-start{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.url-end{flex:none;white-space:nowrap}
+.compact-url:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-line{display:flex;align-items:baseline;gap:6px;min-width:0;margin-top:2px}.url-line>.compact-url{flex:1}.url-label{flex:none;width:30px}
+#ui-tooltip.url-tooltip{max-height:min(50vh,320px);overflow:auto;pointer-events:auto;user-select:text}

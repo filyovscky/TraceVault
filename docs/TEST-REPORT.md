@@ -1,5 +1,15 @@
 # Фактические проверки
 
+## 0.5.3 — one-line URLs with full-address hover
+
+- Current page, capture/session URL rows and URL-valued detail fields use a shared two-span display: the flexible prefix gets CSS text-overflow:ellipsis, while the ending remains visible. Width adapts without a ResizeObserver, canvas measurements or polling. The complete address stays in DOM text/data and is not written back into records. Non-URL titles/quotes/raw JSON keep their usual presentation.
+- The existing delegated tooltip system supports URL hover and keyboard focus on Current page/detail fields. Very long address tooltips are viewport-bounded, selectable and scrollable; scrolling the tooltip does not dismiss it. Escape/outside interaction dismisses it. Unchanged URL refreshes avoid rebuilding the hovered children; changed/removed owners cannot leave a stale URL tooltip. List URL spans do not introduce nested tab stops inside buttons.
+- Focused **installed-Chrome scenario 1/1 PASS**: real native FSA folder/case, a live local HTTP source with a long encoded query, single-line prefix clipping with the exact ending, no horizontal overflow at 320 px, light/dark themes, full hover text inside the viewport, real mouse-wheel tooltip scrolling, keyboard focus, real HTML capture, original/final source strings equal to the complete URL, independent Node SHA-256 of the saved file, full URL in the list/details and unchanged href. Short-URL/source updates also pass. Theme CSS is selected directly for visual QA; this scenario does not claim settings-persistence coverage.
+- A broader English UI/navigation attempt timed out in a heavily loaded environment (about 1.2 GB physical RAM free at inspection); it was stopped and is **not counted as PASS**. Initial targeted attempts also exceeded normal folder/timing limits or the expanded layout-matrix budget. One driver attempted to hover the same still-hovered element after Escape/resize, which correctly kept the tooltip dismissed; it now leaves and re-enters before testing hover. The focused test uses an explicit same-window source tab, and the picker helper accepts a per-call wait timeout without changing existing default timings. No browser permissions or writer behavior were mocked.
+- Actual installed-Chrome 320px light/dark screenshots were inspected: qa/0.5.3-url-installed-{light,dark}.png. The CFT variant remains available in tests/url-display.e2e.mjs but was not completed in this iteration. This is a presentation change; no dependency, permission, schema or original-evidence rewrite is involved.
+- Final `npm run check`: ESLint, **17/17 unit tests**, clean build PASS. All **24** extension files match source/dist/ZIP byte-for-byte. Release SHA-256: `654d593d1c62c022712c998240f08fc538df68967000a461accd57cb2888840f`; `git diff --check` PASS.
+
+
 ## 0.5.2 — no startup inventory of open tabs
 
 - Cause: startRecorder enumerated the selected window's entire existing tab list and wrote one tab_snapshot/Initial page per HTTP(S) tab. This was an address inventory, not a visit. It did not call tabs.update to activate or reload tabs, but created unwanted history entries and disk writes.

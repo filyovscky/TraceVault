@@ -6,7 +6,7 @@ import {t} from './i18n.js';
 import {initControls,setActionLabel} from './icons.js';
 import {exportSession} from './session-recorder.js';
 const $=id=>document.getElementById(id);
-initControls();
+const {refreshTooltip,hideTooltip}=initControls();
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
 let preferences={theme:'system',paused:false,hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true,screenshotStorage:'compact'};
 const statuses={};
@@ -81,7 +81,15 @@ function errorText(e) {
 function action(id,fn) {$(id).addEventListener('click',()=>{try{Promise.resolve(fn()).catch(reportError);}catch(e){reportError(e);}});}
 function el(tag,text,cls) {const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 function button(label,fn,text=false) {const b=el('button');if(label)setActionLabel(b,label,undefined,text);b.addEventListener('click',()=>Promise.resolve().then(fn).catch(reportError));return b;}
-function field(dl,label,value,cls) {dl.append(el('dt',label),el('dd',value ?? '—',cls));}
+function setUrl(node,value,focusable=true){
+  const url=String(value),tail=url.length>24?Math.min(18,Math.ceil(url.length/3)):0;
+  if(node.dataset.fullUrl===url && node.classList.contains('compact-url'))return;
+  node.classList.add('compact-url');node.dataset.fullUrl=url;node.dataset.tooltip=url;node.removeAttribute('title');
+  if(focusable && node.tagName!=='A')node.tabIndex=0;
+  node.replaceChildren(el('span',tail?url.slice(0,-tail):url,'url-start'),el('span',tail?url.slice(-tail):'','url-end'));
+  refreshTooltip(node);
+}
+function field(dl,label,value,cls) {const dd=el('dd',value ?? '—',cls);if(/^https?:\/\/\S+$/u.test(value || ''))setUrl(dd,value);dl.append(el('dt',label),dd);}
 function link(url,label) {const a=el('a',label);if(/^https?:\/\//u.test(url||'')){a.href=url;a.target='_blank';a.rel='noreferrer noopener';}return a;}
 function context() {if(!root || !workspace || !activeCase) throw new Error("Choose a workspace folder and an active case");return {root,workspace,caseId:activeCase};}
 async function readPreferences(){const stored=await setting('preferences');const cleaned=removeLegacyCaptureFilters(stored);if(stored && ('blockedDomains' in stored || 'allowedCaptureHosts' in stored))await setting('preferences',cleaned);preferences={...preferences,...cleaned};}
@@ -146,7 +154,8 @@ async function currentTab() {
 }
 async function refreshSource() {
   const revision=++sourceRevision,source=await currentTab();if(revision!==sourceRevision)return;tab=source;
-  $('source-title').textContent=tab?.title || "Open an HTTP/HTTPS site";$('source-url').textContent=tab?.url || "No website selected";$('source-url').title=tab?.url || '';
+  $('source-title').textContent=tab?.title || "Open an HTTP/HTTPS site";
+  if(tab?.url)setUrl($('source-url'),tab.url);else{if($('source-url').hasAttribute('aria-describedby'))hideTooltip();$('source-url').textContent='No website selected';$('source-url').classList.remove('compact-url');delete $('source-url').dataset.fullUrl;delete $('source-url').dataset.tooltip;$('source-url').removeAttribute('tabindex');}
   if(tab && /^https?:/u.test(tab.url || ''))await setting('sourceTab:'+tab.windowId,tab.id);
   if(revision!==sourceRevision)return;
   let permitted=false;
@@ -254,13 +263,14 @@ function renderList() {
   for(const row of rows.slice(page*25,page*25+25)) {
     const id=row.capture_id || row.annotation_id || row.entity_id || row.event_id,item=el('div',undefined,'item'+(selectedId===id?' selected':''));item.setAttribute('role','listitem');
     const b=button('',()=>view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
-    let title,meta;
-    if(view==='captures'){title=`${row.pinned?"Pinned · ":''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?"Full PNG":row.kind==='screenshot'?'PNG':"Image"} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}\n${row.source.final_url}`;}
+    let title,meta;const urls=[];
+    if(view==='captures'){title=`${row.pinned?"Pinned · ":''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?"Full PNG":row.kind==='screenshot'?'PNG':"Image"} · ${t(row.state)} · ${localTime(row.times.capture_started_at)}`;urls.push({url:row.source.final_url});}
     else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${{text_highlight:'Highlight',quote:'Quote',note:'Note'}[row.type] || 'Annotation'} · ${t(statuses[row.annotation_id] || row.reattachment_status)} · ${localTime(row.created_at)} · ${row.tags.join(', ')}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · unconfirmed · ${row.evidence_refs.length} sources · ${localTime(row.created_at)}`;}
-    else if(row.action==='navigation_recorded'){const e=row.details.event;title=`${navigationNames[e.type] || e.type}${e.title?' · '+e.title:''}`;meta=`${localTime(e.observed_at)}${e.previous_url?'\n'+e.previous_url+' → ':e.url?'\n':''}${e.url || ''}`;}
+    else if(row.action==='navigation_recorded'){const e=row.details.event;title=`${navigationNames[e.type] || e.type}${e.title?' · '+e.title:''}`;meta=localTime(e.observed_at);if(e.previous_url)urls.push({url:e.previous_url,label:'From'});if(e.url)urls.push({url:e.url,label:e.previous_url?'To':null});}
     else {title=row.action;meta=localTime(row.recorded_at);}
-    b.append(el('span',title,'item-title'),el('span',meta,'item-meta'));item.append(b);$('list').append(item);
+    const metadata=el('span',meta,'item-meta');for(const {url,label}of urls){const line=el('span',undefined,'url-line'),value=el('span');if(label)line.append(el('span',label,'url-label'));setUrl(value,url,false);line.append(value);metadata.append(line);}
+    b.append(el('span',title,'item-title'),metadata);item.append(b);$('list').append(item);
   }
   if(!rows.length){
     const empty=el('div',undefined,'empty');

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3 — compact URL display, 27.10.2026
+
+- Current page, capture/session lists and URL detail fields use one-line middle ellipsis, preserving the beginning and ending. Layout adapts to available width with CSS, without canvas measurement or per-element observers.
+- Hover/focus shows the full URL using the existing tooltip system; oversized URL tooltips scroll within the viewport. Tooltips refresh when a URL changes and dismiss when their owner is removed. No nested focus targets inside list buttons.
+- Original URL strings remain intact in DOM text, stored metadata, search/filter inputs, citations, hrefs and exports. No permissions, dependencies, schema or evidence-file changes.
+
 ## 0.5.2 — start from the current page, 27.10.2026
 
 - Start no longer initializes every pre-existing tab as Initial page. It queries only the selected window's active tab and records at most one initial HTTP(S) page; workspace mode can use its already-displayed same-window source. No background tab is activated or reloaded.

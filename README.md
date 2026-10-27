@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.5.2](releases/TraceVault-0.5.2.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.5.3](releases/TraceVault-0.5.3.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.2. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.5.2 add no permissions.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.5.3. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.5.3 add no permissions.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** before creating a case; existing files stay in the original folder.
 
@@ -15,6 +15,8 @@ Site access is granted at installation/update for all websites by default. Captu
 ## Find an action
 
 Hover an icon or focus it with the keyboard to see its English description. Icons have accessible names; Tab, Enter and Space remain available. **Commands** also provides a searchable list with readable action names.
+
+Long URL displays keep their beginning and ending on one line, with a middle ellipsis when space is limited. Hover the URL to read the full address; Current page and URL fields also support keyboard focus. Very long tooltips can scroll. Saved source values, searches, link destinations, citations and exports keep the complete URL; clipping is visual CSS only.
 
 | Group | Icons, left to right |
 | --- | --- |
