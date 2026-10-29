@@ -26,7 +26,7 @@ const paths={
   pin:'m8 3 8 0-1 7 4 4H5l4-4zm4 11v7',edit:'m15 3 6 6-12 12H3v-6zM12 6l6 6',trash:'M3 6h18M8 6V3h8v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
   target:'M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6m12-3a3 3 0 1 1-6 0 3 3 0 0 1 6 0'
 };
-const labelIcons={'Open archived HTML':'html','Copy PDF path':'copy','Open file':'archive','Verify checksum':'verify','Copy SHA-256':'copy','Export PDF':'export','Export original':'export','Create PDF':'pdf','Copy citation':'quote',Pin:'pin',Unpin:'pin','Capture new version':'refresh',Edit:'edit',Show:'eye',Hide:'eye-off','Go to selection':'target','Delete annotation':'trash'};
+const labelIcons={'Compare saved versions':'panels','Open archived HTML':'html','Copy PDF path':'copy','Open file':'archive','Verify checksum':'verify','Copy SHA-256':'copy','Export PDF':'export','Export original':'export','Create PDF':'pdf','Copy citation':'quote',Pin:'pin',Unpin:'pin','Capture new version':'refresh',Edit:'edit',Show:'eye',Hide:'eye-off','Go to selection':'target','Delete annotation':'trash'};
 export function icon(name){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   for(const [key,value]of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false',class:'icon'}))svg.setAttribute(key,value);

@@ -2,6 +2,7 @@ import {setting,exclusive,writeNew,exists,readFile,readJSON,readVerifiedFile} fr
 import {append,appendLoaded,loadState,casePath} from './repository.js';
 import {uuid,now,clock,sha256,VERSION} from './domain.js';
 import {freezeSessionEvent,parseSessionEvent,sameSessionEvent} from './session-format.js';
+import {pageAddress} from './visits.js';
 
 const KEY='navigationRecorder';
 const web=url=>/^https?:\/\//u.test(url || '');
@@ -113,15 +114,19 @@ async function scopedTab(state,tabId){const tab=await chrome.tabs.get(tabId).cat
 export async function recordTabActivated(tabId,windowId,receivedSession){
   const state=await current();if(!state || state.session_id!==receivedSession || windowId!==state.window_id)return;
   const tab=await scopedTab(state,tabId);if(!tab || !tab.active || !web(tab.url))return;
-  if(state.active_tab_id===tabId && state.tabs[tabId]?.url===tab.url)return;
+  if(state.active_tab_id===tabId && pageAddress(state.tabs[tabId]?.url)===pageAddress(tab.url))return;
   state.active_tab_id=tabId;state.tabs[tabId]={url:tab.url,title:tab.title || ''};
   await commit(state,[event(state,'tab_activated',{tab_id:tabId,url:tab.url,title:tab.title || ''})]);
 }
 export async function recordNavigation(kind,details){
-  if(details.frameId!==0)return;
+  if(details.frameId!==0 || kind==='fragment')return;
   const state=await current();if(!state || details.receivedSession!==state.session_id || details.observedWindowId!==state.window_id)return;
   const tab=await scopedTab(state,details.tabId);if(!tab || !web(details.url))return;
-  const previous=state.tabs[tab.id] || {},value=event(state,kind,{observed_at:details.observedAt,tab_id:tab.id,url:details.url,previous_url:previous.url || null,title:tab.url===details.url && tab.status==='complete'?tab.title || '':'',browser_timestamp:details.timeStamp,document_id:details.documentId || null,transition_type:details.transitionType || null,transition_qualifiers:details.transitionQualifiers || []});
+  const previous=state.tabs[tab.id] || {};
+  // History API is also how SPA links navigate. Keep a changed page address,
+  // but do not journal same-address state replacement or anchor movement.
+  if(kind==='history_state' && pageAddress(previous.url)===pageAddress(details.url))return;
+  const value=event(state,'navigation',{observed_at:details.observedAt,tab_id:tab.id,url:details.url,previous_url:previous.url || null,title:tab.url===details.url && tab.status==='complete'?tab.title || '':'',navigation_method:kind==='history_state'?'history_api':'document',browser_timestamp:details.timeStamp,document_id:details.documentId || null,transition_type:details.transitionType || null,transition_qualifiers:details.transitionQualifiers || []});
   state.tabs[tab.id]={url:details.url,title:value.title};if(tab.active)state.active_tab_id=tab.id;await commit(state,[value]);
 }
 export async function recordTabEntered(tabId,windowId,reason){
@@ -134,11 +139,6 @@ export async function recordTabLeft(tabId,windowId,reason){
   const state=await current();if(!state || windowId!==state.window_id)return;
   const previous=state.tabs[tabId];delete state.tabs[tabId];
   if(previous?.url)await commit(state,[event(state,'tab_left',{tab_id:tabId,url:previous.url,title:previous.title || '',reason})]);else await put(state);
-}
-export async function recordTitle(tabId){
-  const state=await current();if(!state)return;const tab=await scopedTab(state,tabId);if(!tab || !web(tab.url))return;
-  const previous=state.tabs[tabId];if(!previous || previous.url!==tab.url || previous.title===tab.title)return;
-  previous.title=tab.title || '';await commit(state,[event(state,'page_title',{tab_id:tabId,url:tab.url,title:previous.title})]);
 }
 export async function recordLinkTarget(details){
   const state=await current();if(!state)return;

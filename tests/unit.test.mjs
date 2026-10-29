@@ -1,3 +1,5 @@
+import {compareText} from '../extension/compare.js';
+import {isSessionVisit,pageAddress} from '../extension/visits.js';
 import {test} from 'node:test';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -47,4 +49,20 @@ test('domain filter matches hosts, subdomains and IDNA; never query strings or s
 test('entity filters resolve source URLs through immutable reference IDs',()=>assert.deepEqual(recordUrls({evidence_refs:['r','missing']},{r:{source_url:'https://example.org'}}),['https://example.org']));
 test('citation includes original full URL, UTC and complete checksums without inventing artifacts',()=>{
   const record={source:{title:'Источник',final_url:'https://example.org/?token=important'},capture_id:'capture',times:{capture_started_at:'2026-10-22T11:42:17.384Z'},artifacts:[{relative_path:'captures/a.html',sha256:'a'.repeat(64)}]};const result=citation(record,'Точная цитата');assert.ok(result.includes(record.source.final_url));assert.ok(result.includes('a'.repeat(64)));assert.ok(result.includes('Точная цитата'));assert.ok(result.includes('.384Z'));assert.match(citation({...record,artifacts:[]}),/No verified files/u);
+});
+
+test('route classification keeps visits and excludes technical state/title/anchor noise',()=>{
+  assert.equal(pageAddress('https://example.org/a?q=1#x'),'https://example.org/a?q=1');
+  for(const type of ['navigation','tab_snapshot','tab_activated','tab_entered'])assert.equal(isSessionVisit({type,url:'https://example.org/a'}),true);
+  for(const type of ['page_title','fragment','tab_left','session_started','link_target'])assert.equal(isSessionVisit({type,url:'https://example.org/a'}),false);
+  assert.equal(isSessionVisit({type:'history_state',url:'https://example.org/a#new',previous_url:'https://example.org/a#old'}),false);
+  assert.equal(isSessionVisit({type:'history_state',url:'https://example.org/b',previous_url:'https://example.org/a'}),true);
+});
+test('bounded text comparison preserves exact changed lines and discloses coarse fallback',()=>{
+  assert.equal(compareText('same','same').same,true);
+  assert.deepEqual(compareText('a\nx\nb','a\ny\nb').rows,[{kind:'removed',text:'x'},{kind:'added',text:'y'}]);
+  assert.deepEqual(compareText('','Ω\n😀').rows,[{kind:'added',text:'Ω'},{kind:'added',text:'😀'}]);
+  assert.deepEqual(compareText('one\ntwo','one').rows,[{kind:'removed',text:'two'}]);
+  assert.equal(compareText('a\nsame\nb','c\nsame\nd',1).method,'changed_region');
+  assert.throws(()=>compareText(Array(12002).fill('line').join('\n'),''),/12000/u);
 });

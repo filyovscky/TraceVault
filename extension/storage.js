@@ -26,8 +26,10 @@ export async function fileHandle(root, path, create = false) {
 }
 export async function readFile(root,path) { return (await fileHandle(root,path)).getFile(); }
 export async function readVerifiedFile(root,artifact) {
-  const file=await readFile(root,artifact.relative_path),bytes=await file.arrayBuffer();
-  if(file.size!==artifact.byte_length || await sha256(bytes)!==artifact.sha256)throw new Error("Checksum mismatch: file changed. Original preview and export blocked. "+artifact.relative_path);
+  const file=await readFile(root,artifact.relative_path),changed=()=>new Error("Checksum mismatch: file changed. Original preview and export blocked. "+artifact.relative_path);
+  // Reject an enlarged/replaced file before allocating its full byte buffer.
+  if(file.size!==artifact.byte_length)throw changed();
+  const bytes=await file.arrayBuffer();if(await sha256(bytes)!==artifact.sha256)throw changed();
   // Return an immutable snapshot: the file may change on disk after this check.
   return new Blob([bytes],{type:artifact.mime_type});
 }
@@ -86,10 +88,10 @@ export async function openWorkspace(root, mode='workspace',{persist=true}={}) {
   if(persist)await setting('root',root);
   return metadata;
 }
-export async function prepareWorkspace(selected,mode='workspace',{createChild=false}={}){
+export async function prepareWorkspace(selected,mode='workspace',{createChild=false,forceChild=false}={}){
   if(!['workspace','single_case'].includes(mode))throw new Error('Unknown workspace layout');
-  if(createChild && !await exists(selected,'workspace.json')){
-    let populated=false;for await(const entry of selected.entries()){if(entry){populated=true;break;}}
+  if(forceChild || createChild && !await exists(selected,'workspace.json')){
+    let populated=forceChild;for await(const entry of selected.entries()){if(entry){populated=true;break;}}
     if(populated){
       for(let number=1;number<=10000;number++){
         const name=number===1?'TraceVault':'TraceVault-'+number;

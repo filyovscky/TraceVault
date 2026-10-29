@@ -1,5 +1,5 @@
 import {enqueue,handleContextMenu} from './context-actions.js';
-import {serializeRecorder,initializeRecorder,recorderIngress,startRecorder,stopRecorder,retryRecorder,recordNavigation,recordTabEntered,recordTabLeft,recordTabActivated,recordTitle,recordLinkTarget,recordWindowClosed} from './session-recorder.js';
+import {serializeRecorder,initializeRecorder,recorderIngress,startRecorder,stopRecorder,retryRecorder,recordNavigation,recordTabEntered,recordTabLeft,recordTabActivated,recordLinkTarget,recordWindowClosed} from './session-recorder.js';
 let recorderInitialized=false;
 const recorderReady=serializeRecorder(initializeRecorder).then(()=>{recorderInitialized=true;});
 const recorderTask=task=>recorderReady.then(()=>serializeRecorder(task));
@@ -19,14 +19,12 @@ function navigation(kind,d){
 }
 chrome.webNavigation.onCommitted.addListener(d=>navigation('navigation',d));
 chrome.webNavigation.onHistoryStateUpdated.addListener(d=>navigation('history_state',d));
-chrome.webNavigation.onReferenceFragmentUpdated.addListener(d=>navigation('fragment',d));
 chrome.webNavigation.onCreatedNavigationTarget.addListener(d=>observe(()=>recordLinkTarget(d)));
 chrome.tabs.onCreated.addListener(tab=>observe(()=>recordTabEntered(tab.id,tab.windowId,'created')));
 chrome.tabs.onActivated.addListener(info=>{const session=recorderInitialized?Promise.resolve(recorderIngress()):recorderReady.then(recorderIngress);session.then(id=>{if(id)observe(()=>recordTabActivated(info.tabId,info.windowId,id));}).catch(()=>{});});
 chrome.tabs.onAttached.addListener((id,info)=>{moves.set(id,(moves.get(id)||0)+1);observe(()=>recordTabEntered(id,info.newWindowId,'moved_in'));});
 chrome.tabs.onDetached.addListener((id,info)=>{moves.set(id,(moves.get(id)||0)+1);observe(()=>recordTabLeft(id,info.oldWindowId,'moved_out'));});
 chrome.tabs.onRemoved.addListener((id,info)=>{moves.delete(id);if(!info.isWindowClosing)observe(()=>recordTabLeft(id,info.windowId,'closed'));});
-chrome.tabs.onUpdated.addListener((id,info)=>{if(info.title)observe(()=>recordTitle(id));});
 chrome.windows.onRemoved.addListener(id=>observe(()=>recordWindowClosed(id)));
 const menus={quote:"Save selected text",highlight:"Highlight selection",entity:"Create entity from selection",note:"Add note to selection",image:"Save image",'edit-highlight':'Edit highlight note','delete-highlight':'Delete highlight here'};
 chrome.runtime.onInstalled.addListener(async()=>{

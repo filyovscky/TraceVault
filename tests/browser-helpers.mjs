@@ -29,7 +29,7 @@ export async function extensionPage(context) {
 // CDP supplies a REAL disk directory via browser drag-and-drop. Only picker selection
 // is automated; storage, handles, permissions, writes and readback are native FSA.
 // This does not test the operating system picker UI itself.
-export async function chooseDirectory(page,directory,{button='pick-root',timeout=5000}={}) {
+export async function chooseDirectory(page,directory,{button='pick-root',timeout=5000,readySelector='#folder-state',readyText='Read/write access'}={}) {
   await mkdir(directory,{recursive:true});
   await page.evaluate(()=>{
     window.addEventListener('dragover',e=>e.preventDefault());
@@ -40,7 +40,7 @@ export async function chooseDirectory(page,directory,{button='pick-root',timeout
   await expect.poll(()=>page.evaluate(()=>window.__qaDirectory?.kind)).toBe('directory');
   await page.evaluate(()=>{window.showDirectoryPicker=async()=>{await window.__qaDirectory.requestPermission({mode:'readwrite'});return window.__qaDirectory;};});
   await clickAction(page,'#'+button);
-  await expect(page.locator('#folder-state')).toContainText('Read/write access',{timeout});
+  await expect(page.locator(readySelector)).toContainText(readyText,{timeout});
 }
 // Follow the same disclosure controls as a user; no forced or synthetic clicks.
 export async function clickAction(page,selector){

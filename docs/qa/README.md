@@ -1,5 +1,7 @@
 # Реальные снимки интерфейса
 
+0.7.0: [manual comparison, light](0.7.0-comparison-light.png) / [dark](0.7.0-comparison-dark.png), [new-case destination and explicit stop choice](0.7.0-new-case-dialog.png), [fresh case without old stopped-session state](0.7.0-new-case-ready.png). Actual installed Chrome at 360px, real source files and verified comparison. The HTML-looking added text is deliberately rendered literally; offline/no-request and tamper checks are in TEST-REPORT.md.
+
 0.6.0 Focus: [light, 320 px](0.6.0-focus-light-320.png), [dark, 420 px](0.6.0-focus-dark-420.png) and [case menu, 320 px](0.6.0-focus-menu-320.png). Actual extension document in installed Chrome after real HTML/PNG/highlight/export operations. Both browsers cover 320/360/420/520 px in both themes, collection counts/details/back navigation and native action-menu bounds. Native side-panel attachment and the full Windows DPI matrix were not rerun for this iteration.
 
 0.5.3: actual installed Chrome at 320 px, [light URL hover](0.5.3-url-installed-light.png) / [dark URL hover](0.5.3-url-installed-dark.png). The address keeps its beginning/end on one line; the full encoded URL is in a scrollable tooltip. Focused browser/data-integrity coverage and incomplete broader smoke coverage are distinguished in TEST-REPORT.md.

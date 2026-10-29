@@ -40,8 +40,8 @@ test('one-window scope, tab moves, panel closure, SPA, export and window closure
     await panel.locator('#session-start').click();await expect(panel.locator('#session-state')).toContainText('Recording this window',{timeout:30000});
     const pinnedCase=(await state(panel)).case_id,trackedId=(await state(panel)).window_id,tabId=await panel.evaluate(async url=>(await chrome.tabs.query({})).find(t=>t.url===url).id,source.url());
     await panel.evaluate(({id,url})=>chrome.tabs.update(id,{url}),{id:outside.tabs[0].id,url:q.fixture.url+'/OUTSIDE_SECRET_NEXT'});
-    await source.evaluate(()=>history.pushState({},'', '/tracked-spa'));await eventSeen(panel,e=>e.type==='history_state' && e.url.endsWith('/tracked-spa'));
-    await source.evaluate(()=>location.hash='section');await eventSeen(panel,e=>e.type==='fragment' && e.url.endsWith('#section'));
+    await source.evaluate(()=>history.pushState({},'', '/tracked-spa'));await eventSeen(panel,e=>e.type==='navigation' && e.navigation_method==='history_api' && e.url.endsWith('/tracked-spa'));
+    await source.evaluate(()=>location.hash='section');await expect(panel.locator('#source-url')).toHaveText(source.url());
     await source.evaluate(()=>{const a=document.createElement('a');a.href='/tracked-link';a.textContent='Test link';a.id='qa-link';document.body.prepend(a);});await source.locator('#qa-link').click();await eventSeen(panel,e=>e.type==='navigation' && e.url.endsWith('/tracked-link') && e.transition_type==='link');
     await source.goBack();await eventSeen(panel,e=>e.transition_qualifiers?.includes('forward_back'));
     await source.reload();await eventSeen(panel,e=>e.transition_type==='reload');
@@ -55,7 +55,7 @@ test('one-window scope, tab moves, panel closure, SPA, export and window closure
     // while outside, then ensure it wasn't misclassified as an in-window visit.
     const movedRows=await records(panel);expect(movedRows.some(r=>r.details.event.type==='navigation' && r.details.event.url?.includes('OUTSIDE_MOVED_SECRET'))).toBe(false);
     await source.goto(q.fixture.url+'/tracked-return');await eventSeen(panel,e=>e.url?.endsWith('/tracked-return'));
-    await clickAction(panel,'#new-case');await panel.locator('#case-title').fill('Different active case');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();
+    await clickAction(panel,'#new-case');await panel.locator('#stop-for-new-case').uncheck();await panel.locator('#case-title').fill('Different active case');await panel.locator('#create-case').click();await expect(panel.locator('#case-dialog')).not.toBeVisible();
     await source.goto(q.fixture.url+'/pinned-original-case');await expect.poll(async()=>(await records(panel,pinnedCase)).some(r=>r.details.event.url?.endsWith('/pinned-original-case'))).toBe(true);expect(await records(panel)).toEqual([]);await panel.locator('#case-select').selectOption(pinnedCase);await expect.poll(()=>panel.locator('#case-select').inputValue()).toBe(pinnedCase);
     await panel.close();await source.goto(q.fixture.url+'/tracked-panel-closed');
     panel=await extensionPage(q.context);await eventSeen(panel,e=>e.url?.endsWith('/tracked-panel-closed'));
@@ -66,7 +66,7 @@ test('one-window scope, tab moves, panel closure, SPA, export and window closure
     const exportPath=await panel.evaluate(async()=>{const s=await import('./storage.js'),r=await import('./repository.js'),root=await s.setting('root'),w=await s.readJSON(root,'workspace.json'),id=await s.setting('activeCase');return (await s.exclusive(()=>r.loadState(root,w,id))).audit.findLast(e=>e.action==='navigation_exported').details.artifact.relative_path;});
     const exported=JSON.parse(await readFile(path.join(q.directory,exportPath),'utf8'));expect(exported.events).toHaveLength(saved.length);expect(exported.events.map(e=>e.event.sequence)).toEqual(saved.map((_,i)=>i+1));await verifyFiles(q.directory,saved);
     expect(JSON.stringify(await records(panel))).not.toContain('OUTSIDE_SECRET');expect(JSON.stringify(await state(panel))).not.toContain('OUTSIDE_SECRET');expect(JSON.stringify(await records(panel))).not.toContain('AFTER_STOP_SECRET');
-    await clickAction(panel,'#session-journal');await expect(panel.locator('#search')).toHaveValue((await state(panel)).session_id);await panel.locator('#list .item-button').filter({hasText:'Session stopped'}).first().click();await expect(panel.locator('#details-body')).toContainText('SHA-256');
+    await clickAction(panel,'#session-journal');await expect(panel.locator('#search')).toHaveValue((await state(panel)).session_id);await panel.locator('#filter-options').evaluate(n=>n.open=true);await panel.locator('#visits-only').uncheck();await panel.locator('#list .item-button').filter({hasText:'Session stopped'}).first().click();await expect(panel.locator('#details-body')).toContainText('SHA-256');
     const altered=path.join(q.directory,saved[0].details.artifact.relative_path);await writeFile(altered,Buffer.concat([await readFile(altered),Buffer.from(' ')]));await clickAction(panel,'#session-export');await expect(panel.locator('#status')).toContainText('Checksum mismatch');
     await panel.locator('#session-start').click();await expect(panel.locator('#session-state')).toContainText('Recording this window');const closing=(await state(panel)).window_id;await panel.evaluate(id=>chrome.windows.remove(id),closing);
     panel=await extensionPage(q.context);await expect.poll(async()=>(await state(panel)).status).toBe('stopped');expect((await records(panel)).at(-1).details.event.reason).toBe('window_closed');

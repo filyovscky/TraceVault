@@ -1,4 +1,4 @@
-# Window-scoped session recorder, 0.5.0
+# Window-scoped session recorder
 
 ## Design and API prototype
 
@@ -8,9 +8,15 @@ From 0.5.2, that scope means future activity, not an initial inventory. Start qu
 
 Navigation and activation receipts bind to the session ID before asynchronous lookup/queueing. Receipts with no recording session are discarded; a callback cannot be adopted by a later session just because tabs.get resolved late. This volatile ingress gate is reconstructed from persisted state when a worker wakes, before accepting the first waking navigation; it is not the primary session store and does not compare Chrome process timestamps to wall time. Stop/failure closes the gate. Interruption/persistence limits below still apply.
 
-`webNavigation` is required for committed navigations, History API and fragments. Linked-tab provenance uses `onCreatedNavigationTarget`; previous_url is chronological context, not proof of a click. Titles use tabs.onUpdated only when the currently scoped tab matches the tracked URL. Membership uses tabs.onCreated/onAttached/onDetached/onRemoved. windows.onRemoved ends the session. Navigation membership is resolved before the disk queue, guarded against tab moves during that lookup, and checked again before writing. Events in transit during tab moves can be conservatively omitted.
+`webNavigation` is required for committed navigations, History API address changes. Linked-tab provenance uses `onCreatedNavigationTarget`; previous_url is chronological context, not proof of a click. Standalone title events and fragment-only changes are no longer collected from 0.7.0. Visit titles are retained when available at acquisition; committed navigation may not yet have its final title. Membership uses tabs.onCreated/onAttached/onDetached/onRemoved. windows.onRemoved ends the session. Navigation membership is resolved before the disk queue, guarded against tab moves during that lookup, and checked again before writing. Events in transit during tab moves can be conservatively omitted.
 
 Technical references checked 27 October 2026: [Chrome webNavigation](https://developer.chrome.com/docs/extensions/reference/api/webNavigation) and [MV3 worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle). The real-browser API prototype wrote from the worker to a user-directory FSA handle persisted in IndexedDB, read each result back, and independently verified the bytes/SHA-256 with Node. No mock writer or Downloads fallback.
+
+## Current route behavior, 0.7.0
+
+The route records visits, not live document mutations. History API callbacks with the same URL after removing the fragment are ignored before writing. A real path/query change inside a SPA is stored as navigation with navigation_method=history_api; committed document navigation uses navigation_method=document. Reload/back/forward remain visits. Fragment-only callbacks and tabs.onUpdated title listeners are not registered by the recorder. No DOM observers, content snapshots or change-monitor scheduler are added. Existing files retain their original types/bytes.
+
+The session-journal action defaults to Visited pages only. It shows initial page, navigations, explicit tab visits and tab entry into the selected window. Legacy SPA events are shown only when their page address changed. Lifecycle/provenance events remain in the raw journal and verified export, available by clearing that filter. Manual content comparison is an independent read-only [saved-version action](VERSION-COMPARISON.md).
 
 ## State and messages
 

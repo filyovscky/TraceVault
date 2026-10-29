@@ -5,13 +5,15 @@ import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,u
 import {t} from './i18n.js';
 import {initControls,setActionLabel} from './icons.js';
 import {exportSession} from './session-recorder.js';
+import {archivedText,compareText} from './compare.js';
+import {isSessionVisit} from './visits.js';
 const $=id=>document.getElementById(id);
 const {refreshTooltip,hideTooltip}=initControls();
 let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotations:{},entities:{},refs:{},audit:[]},tab=null,view='captures',page=0,busy=false,controller=null,pending=null,selectedId=null,viewerUrl=null,dialogSaving=false;
 let preferences={theme:'system',paused:false,hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true,screenshotStorage:'compact'};
 const statuses={};
 const sessionId=uuid();
-const filterIds=['search','type-filter','status-filter','annotation-type-filter','domain-filter','date-filter','current-page-only'];
+const filterIds=['search','type-filter','status-filter','annotation-type-filter','domain-filter','date-filter','current-page-only','visits-only'];
 const viewFilters={};
 function resetFilters(){for(const id of filterIds){const input=$(id);if(input.type==='checkbox')input.checked=false;else input.value='';}page=0;renderList();}
 function focusSearch(){if(!activeCase)return;$('details').hidden=true;selectedId=null;renderList();$('search').focus();$('search').select();}
@@ -24,8 +26,10 @@ function switchView(next){
 }
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt',folderLabel='';
+let caseDestination=null,casePicking=false;
+let comparison=null,comparing=false,comparisonRevision=0;
 let navigationState=null,recorderBusy=false,ownWindowId=null,sessionRefreshTimer;
-const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Navigation',history_state:'Page state changed',fragment:'Page fragment changed',tab_entered:'Tab entered',tab_left:'Tab left',tab_activated:'Tab visited',page_title:'Page title',link_target:'Linked tab'};
+const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Page visited',history_state:'Page visited',fragment:'Page anchor (legacy)',tab_entered:'Page entered this window',tab_left:'Tab left',tab_activated:'Tab visited',page_title:'Page title (legacy)',link_target:'Linked tab'};
 function selectedSessionId(){return navigationState?.case_id===activeCase && navigationState.workspace_id===workspace?.workspace_id?navigationState.session_id:[...state.audit].reverse().find(e=>e.action==='navigation_recorded')?.details.session_id;}
 function renderSession(){
   const ready=!!(root && workspace && activeCase),active=['starting','recording','stopping'].includes(navigationState?.status),pendingCount=navigationState?.pending?.length || 0,id=selectedSessionId();
@@ -40,7 +44,8 @@ function renderSession(){
   $('session-export').disabled=!id || recorderBusy || (id===navigationState?.session_id && (active || pendingCount>0));
   $('session-retry').hidden=!pendingCount || navigationState?.status!=='save_error';$('session-retry').disabled=recorderBusy;
   const scope=navigationState?.window_id===ownWindowId?'this window':'another window';
-  $('session-state').textContent=recorderBusy?'Updating session…':!navigationState?'Off · URLs and titles from this window only':`${active?'Recording '+scope:'Stopped'} · ${navigationState.case_label} · ${navigationState.saved} events saved${pendingCount?' · '+pendingCount+' pending':''}${navigationState.error?' · '+navigationState.error:''}`;
+  const belongsHere=navigationState?.case_id===activeCase && navigationState?.workspace_id===workspace?.workspace_id,shown=active || pendingCount || belongsHere?navigationState:null;
+  $('session-state').textContent=recorderBusy?'Updating session…':!shown?'Off · URLs and titles from this window only':`${active?'Recording '+scope:'Stopped'} · ${shown.case_label} · ${shown.saved} events saved${pendingCount?' · '+pendingCount+' pending':''}${shown.error?' · '+shown.error:''}`;
 }
 async function sessionCommand(type,extra={}){
   recorderBusy=true;renderSession();
@@ -54,14 +59,15 @@ function updateSetup(){
   const step=folderReady && !needsAccess?1:0;
   ['step-folder','step-case','step-capture'].forEach((id,index)=>{const node=$(id);node.dataset.complete=String(!needsAccess && (index<step || ready));if(index===(ready && !needsAccess?2:step))node.setAttribute('aria-current','step');else node.removeAttribute('aria-current');});
   $('setup-next').textContent=initializing?'Checking your workspace…':connecting?'Connecting the folder and checking saved cases…':caseSaving?'Creating the case and verifying files…':!root?'Step 1 of 3 · Choose a folder for your files.':!folderReady || needsAccess?'Step 1 of 3 · Restore folder access or choose another folder.':'Step 2 of 3 · Create a case to organize your materials.';
-  $('workspace-hint').textContent=root && needsAccess?'Restore folder access to continue.':ready?`Ready · ${cases.find(c=>c.case_id===activeCase)?.title || 'Active case'}. Captures and notes will be saved here.`:folderReady?'Your folder is connected. Create a case to continue.':'Connect the folder before creating a case.';
-  $('new-case').disabled=locked || busy || !folderReady || folderPermission!=='granted';
-  $('new-case').hidden=workspace?.mode==='single_case' && cases.length>0;
+  $('workspace-hint').textContent=root && needsAccess?'Restore access for the previous case, or choose New case with another destination.':ready?`Ready · ${cases.find(c=>c.case_id===activeCase)?.title || 'Active case'}. Captures and notes will be saved here.`:folderReady?'Your folder is connected. Create a case to continue.':'Choose a destination folder in New case, or connect a workspace.';
+  $('new-case').disabled=locked || busy || casePicking;
+  $('new-case').hidden=false;
   const firstCase=folderReady && !cases.length;setActionLabel($('new-case'),firstCase?'Create first case':'New case','plus',true);
-  const createHost=ready?$('case-menu-create'):$('case-create-slot');if($('new-case').parentElement!==createHost)createHost.append($('new-case'));
+  const createHost=root && (needsAccess || firstCase)?$('case-create-slot'):$('case-menu-create');if($('new-case').parentElement!==createHost)createHost.append($('new-case'));
   $('case-select').hidden=!cases.length;$('case-select').disabled=locked || busy || needsAccess || !cases.length;
   document.querySelector('label[for="case-select"]').textContent=!folderReady?'Cases':cases.length?'Active case':'Create your first case';
-  $('create-case').disabled=locked || !folderReady || folderPermission!=='granted';
+  $('create-case').disabled=locked || casePicking || !caseDestination;
+  $('case-folder').disabled=locked || casePicking;
   $('case-title').readOnly=caseSaving;$('case-code').readOnly=caseSaving;
   for(const id of ['capture-page','capture-screen','capture-full','capture-pdf','selection-highlight','selection-quote','selection-note','selection-entity','manual-note','export-case','archive-first'])$(id).disabled=locked || busy || !ready;
   for(const id of ['pick-root','change-root','reauthorize'])$(id).disabled=locked || busy;
@@ -70,11 +76,13 @@ function updateSetup(){
 }
 function openCaseDialog(){
   if(initializing || connecting || caseSaving)throw new Error('Wait for workspace setup to finish.');
-  if(!root || !workspace)throw new Error('Connect a workspace folder before creating a case.');
-  if(folderPermission!=='granted')throw new Error('Restore folder access before creating a case.');
-  if(workspace.mode==='single_case' && cases.length)throw new Error('This folder supports only one case');
+  caseDestination=root && workspace && folderPermission==='granted' && !(workspace.mode==='single_case' && cases.length)?{root,workspace,label:folderLabel || root.name}:null;
   $('case-title').value='';$('case-code').value='';
-  $('case-target').textContent=`Save in: ${folderLabel || root.name}`;$('case-save-state').textContent='Materials and notes will be grouped in this case.';
+  $('case-target').textContent=caseDestination?`Save in: ${caseDestination.label}`:'Choose a destination folder for this new case. Your previous case stays intact.';
+  const recording=navigationState?.status==='recording';$('new-case-session').hidden=!recording;$('stop-for-new-case').checked=recording && navigationState.window_id===ownWindowId;
+  $('new-case-session-label').textContent=recording?'Stop recording '+navigationState.case_label+' before creating this case':'';
+  $('case-save-state').textContent=navigationState?.pending?.length?'The previous session has pending events. They must be recovered before a new recording starts.':'Materials and notes will be grouped in this case.';
+  updateSetup();
   $('case-dialog').showModal();$('case-title').focus();
 }
 function status(message,error=false) {$('status').textContent=message;$('status').title=message;$('status').parentElement.dataset.error=String(error);const alert=document.querySelector('dialog[open] .dialog-error');if(alert){alert.hidden=!error;alert.textContent=error?message:'';}}
@@ -250,24 +258,26 @@ function listTime(value){const date=new Date(value);return Number.isFinite(date.
 function renderList() {
   renderSession();
   $('collection').dataset.collectionView=view;
+  const pathOnly=view==='audit' && $('visits-only').checked;$('collection').dataset.path=String(pathOnly);$('visits-only-label').hidden=view!=='audit';
   for(const key of ['captures','annotations','audit']){
     const control=document.querySelector(`nav [data-view="${key}"]`);let count=control.querySelector('.view-count');
     if(!count){count=el('span',undefined,'view-count');count.setAttribute('aria-hidden','true');control.append(count);}
     count.textContent=Object.values(state[key] || {}).filter(r=>key!=='annotations' || !r.deleted).length;
   }
-  $('collection-title').textContent={captures:'Materials',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
+  $('collection-title').textContent=pathOnly?'Investigation path':{captures:'Materials',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
   $('manual-note').hidden=view!=='annotations';
   $('capture-type-label').hidden=view!=='captures';$('capture-status-label').hidden=view!=='captures';$('annotation-type-label').hidden=view!=='annotations';
   const query=$('search').value.trim().toLocaleLowerCase('en'),type=$('type-filter').value,filter=$('status-filter').value,domain=$('domain-filter').value.trim().toLowerCase(),date=$('date-filter').value;
   let rows=Object.values(state[view] || {});
   if(view==='annotations')rows=rows.filter(a=>!a.deleted);
   const total=rows.length;
-  const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
+  const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,pathOnly,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
   $('filter-count').textContent=activeFilters?` · ${activeFilters} active`:'';
   $('reset-filters').disabled=!activeFilters;
   const annotationCounts=[['text_highlight','highlight'],['quote','quote'],['note','note']].map(([type,label])=>{const count=rows.filter(r=>r.type===type).length;return `${count} ${label}${count===1?'':'s'}`;}).join(' · ');
   $('collection-description').textContent={captures:`${total} saved record${total===1?'':'s'} in this case`,annotations:annotationCounts,entities:`${total} entit${total===1?'y':'ies'} in this case`,audit:`${total} history event${total===1?'':'s'} in this case`}[view];
   rows=rows.filter(r=>{
+    if(pathOnly && (r.action!=='navigation_recorded' || !isSessionVisit(r.details?.event)))return false;
     if(query && !JSON.stringify(r).toLocaleLowerCase('en').includes(query))return false;
     if(view==='captures' && ((type && r.kind!==type) || (filter && r.state!==filter)))return false;
     if(view==='annotations' && $('annotation-type-filter').value && r.type!==$('annotation-type-filter').value)return false;
@@ -331,7 +341,41 @@ function showCapture(id) {
   if(['failed','interrupted','cancelled','partial'].includes(c.state))box.append(button("Capture new version",async()=>{await refreshSource();if(tab?.url!==c.source.final_url)throw new Error("Open the source URL and click the TraceVault extension icon before retrying");await runCapture(c.capture_request || (c.kind==='webpage'?'page':c.kind==='screenshot'?'screen':'image'),{id:uuid(),tabId:tab.id,caseId:c.case_id,sourceUrl:c.source.final_url,imageUrl:c.image_source_url});}));
   if(c.warnings.length){box.append(el('h2',"Capture diagnostics"));const pre=el('pre',JSON.stringify(c.warnings,null,2));box.append(pre);}
   const refs=Object.values(state.refs).filter(r=>r.capture_id===id);if(refs.length)box.append(el('p',`Linked evidence references: ${refs.length}`));
+  if(c.kind==='webpage' && ['completed','partial'].includes(c.state))box.append(button('Compare saved versions',()=>openComparison(c),true));
 }
+function openComparison(record){
+  const versions=Object.values(state.captures).filter(c=>c.kind==='webpage' && ['completed','partial'].includes(c.state) && c.source.final_url===record.source.final_url && c.artifacts.some(a=>a.mime_type==='text/html')).sort((a,b)=>a.times.capture_started_at.localeCompare(b.times.capture_started_at));
+  comparison={...context(),caseId:record.case_id,versions};comparisonRevision++;
+  for(const id of ['compare-before','compare-after'])$(id).replaceChildren(...versions.map(c=>Object.assign(el('option',c.evidence_number+' · '+localTime(c.times.capture_started_at)+(c.state==='partial'?' · Partial':'')),{value:c.capture_id})));
+  const index=versions.findIndex(c=>c.capture_id===record.capture_id);$('compare-after').value=versions[index>0?index:Math.min(1,versions.length-1)]?.capture_id || '';$('compare-before').value=versions[Math.max(0,index-1)]?.capture_id || '';
+  $('compare-source').textContent=record.source.final_url;$('compare-result').replaceChildren();$('compare-files').replaceChildren();$('compare-status').textContent=versions.length<2?'Save another HTML version of this URL, then compare the two saved versions.':'Compare archived document text. Layout, images, CSS and embedded frames are not compared.';
+  updateCompareControls();$('comparison-dialog').showModal();
+}
+function updateCompareControls(){
+  $('compare-run').disabled=comparing || !comparison || comparison.versions.length<2 || $('compare-before').value===$('compare-after').value;
+  $('compare-before').disabled=comparing;$('compare-after').disabled=comparing;
+}
+action('compare-run',async()=>{
+  if(!comparison || comparing)return;const c=comparison,revision=++comparisonRevision,ids=[$('compare-before').value,$('compare-after').value];
+  if(ids[0]===ids[1])throw new Error('Choose two different saved versions.');
+  comparing=true;updateCompareControls();$('compare-status').textContent='Reading and verifying both original files…';$('compare-result').replaceChildren();$('compare-files').replaceChildren();
+  try{
+    const fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId)),records=ids.map(id=>fresh.captures[id]);
+    if(records.some(r=>!r || r.kind!=='webpage') || records[0].source.final_url!==records[1].source.final_url)throw new Error('Choose two HTML captures of the same source URL in the original case.');
+    const artifacts=records.map(r=>r.artifacts.find(a=>a.mime_type==='text/html'));
+    if(artifacts.some(a=>!a || a.byte_length>8*1024*1024))throw new Error('Text comparison supports saved HTML files up to 8 MB each. Open larger originals separately.');
+    const originals=[];for(const artifact of artifacts)originals.push(await readVerifiedFile(c.root,artifact));
+    const result=compareText(archivedText(await originals[0].text()),archivedText(await originals[1].text()));
+    if(revision!==comparisonRevision || !$('comparison-dialog').open)return;
+    const dl=el('dl');records.forEach((r,i)=>{field(dl,i?'After capture':'Before capture',r.evidence_number+' · '+localTime(r.times.capture_started_at));field(dl,i?'After SHA-256':'Before SHA-256',artifacts[i].sha256,'hash');});$('compare-files').append(dl);
+    $('compare-status').textContent=result.same?(artifacts[0].sha256===artifacts[1].sha256?'Verified files are identical.':'Verified HTML files differ; extracted document text is unchanged.'):result.method==='changed_region'?'Large change: before/after regions shown, including any unchanged lines inside those regions.':'Text differences · − removed, + added. Originals are unchanged.';
+    const shown=result.rows.slice(0,1500);for(const row of shown){const line=el('div',`${{added:'+ ',removed:'− ',equal:'  '}[row.kind]}${row.text}`,'diff-line diff-'+row.kind);$('compare-result').append(line);}
+    if(result.rows.length>shown.length)$('compare-result').append(el('p',`Showing ${shown.length} of ${result.rows.length} comparison lines. Open the originals for the complete text.`,'muted'));
+  }catch(e){if(revision===comparisonRevision){$('compare-status').textContent=errorText(e);$('compare-result').replaceChildren();$('compare-files').replaceChildren();}throw e;}
+  finally{comparing=false;updateCompareControls();}
+});
+for(const id of ['compare-before','compare-after'])$(id).addEventListener('change',()=>{comparisonRevision++;$('compare-result').replaceChildren();$('compare-files').replaceChildren();$('compare-status').textContent='Run comparison to verify and compare the selected versions.';updateCompareControls();});
+$('comparison-dialog').addEventListener('close',()=>{comparisonRevision++;comparison=null;$('compare-result').replaceChildren();$('compare-files').replaceChildren();});
 function showAnnotation(id) {
   const a=state.annotations[id];if(!a)return;const box=details("Annotation",id);box.append(el('blockquote',a.selection?.exact || ''),el('p',a.note));const dl=el('dl');field(dl,"Created",localTime(a.created_at));field(dl,"Updated",localTime(a.updated_at));field(dl,"Anchor status",t(statuses[id] || a.reattachment_status));field(dl,"Tags",a.tags.join(', '));box.append(dl);referenceDetails(box,state.refs[a.reference_id]);
   const row=el('div',undefined,'actions');row.append(button("Edit",()=>editAnnotation(a)),button(a.hidden?"Show":"Hide",async()=>{await updateAnnotation(root,workspace,a.case_id,id,{hidden:!a.hidden});await refresh();await refreshSource();showAnnotation(id);}),button("Go to selection",async()=>{await refreshSource();if(tab?.url!==a.source_url)throw new Error("Open the original URL first");const result=await chrome.tabs.sendMessage(tab.id,{type:'TV_SCROLL',id});status(t(result.status));}),button("Delete annotation",async()=>{const c={...context(),caseId:a.case_id};await updateAnnotation(c.root,c.workspace,c.caseId,id,{deleted:true});lastDeleted={...c,id};$('undo-delete').hidden=false;await refresh();$('details').hidden=true;status("Annotation removed from the list. Undo is available.");}));box.append(row);
@@ -407,21 +451,38 @@ action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readw
 action('change-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'}),result=await connect(handle,workspace?.mode || 'workspace',{createChild:true});status(result.createdIn?`Created workspace: ${result.folderLabel}`:"Workspace connected");});
 action('reauthorize',async()=>{if(!root)throw new Error("Choose a workspace folder");if(await root.requestPermission({mode:'readwrite'})!=='granted'){await renderFolder();throw new Error("Chrome denied write access. Use Change workspace folder to select the same folder again.");}await connect(root);status("Folder access restored and verified by writing and reading");});
 action('new-case',openCaseDialog);
+action('case-folder',async()=>{
+  const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault-new-case'});casePicking=true;updateSetup();
+  try{
+    const selected=await exclusive(async()=>{
+      let prepared=await prepareWorkspace(handle,'workspace',{createChild:true});
+      if(prepared.metadata.mode==='single_case' && (await listCases(prepared.root,prepared.metadata)).length)prepared=await prepareWorkspace(handle,'workspace',{forceChild:true});
+      await listCases(prepared.root,prepared.metadata);return prepared;
+    });
+    caseDestination={root:selected.root,workspace:selected.metadata,label:selected.createdIn?selected.createdIn+' / '+selected.root.name:selected.root.name};
+    $('case-target').textContent='Save in: '+caseDestination.label;
+  }finally{casePicking=false;updateSetup();}
+});
 $('case-form').addEventListener('submit',event=>{
   event.preventDefault();if(caseSaving)return;
   (async()=>{
-    if(initializing || connecting || !root || !workspace)throw new Error('Connect a workspace folder before creating a case.');
-    if(folderPermission!=='granted')throw new Error('Restore folder access before creating a case.');
-    const target={root,workspace},title=$('case-title').value,code=$('case-code').value;
-    caseSaving=true;updateSetup();$('case-save-state').textContent='Creating case…';let saved=false;
+    if(initializing || connecting || casePicking || !$('case-dialog').open || !caseDestination)throw new Error('Choose a destination folder before creating a case.');
+    const target=caseDestination,title=$('case-title').value,code=$('case-code').value;
+    caseSaving=true;updateSetup();$('case-save-state').textContent='Creating case…';let saved=false,stopError=null;
     try{
+      if(await target.root.queryPermission({mode:'readwrite'})!=='granted')throw new Error('Choose a destination folder with write access.');
+      if($('stop-for-new-case').checked && navigationState?.status==='recording')try{await sessionCommand('TV_SESSION_STOP');}catch(e){stopError=e;}
       const c=await exclusive(()=>createCase(target.root,target.workspace,title,code));saved=true;
-      cases.push(c);activeCase=c.case_id;await setCases();await refresh();$('case-dialog').close();status('Case created');
+      if(workspace?.workspace_id!==target.workspace.workspace_id){lastDeleted=null;$('undo-delete').hidden=true;}
+      await setting('root',target.root);root=target.root;workspace=target.workspace;folderLabel=target.label;folderPermission='granted';cases=await exclusive(()=>listCases(root,workspace));activeCase=c.case_id;state={captures:{},annotations:{},entities:{},refs:{},audit:[]};page=0;$('details').hidden=true;selectedId=null;
+      for(const key of Object.keys(viewFilters))delete viewFilters[key];for(const key of Object.keys(statuses))delete statuses[key];view='captures';document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});resetFilters();
+      await setCases();await refresh();$('case-dialog').close();status(stopError?'Case created. Previous recording needs recovery: '+errorText(stopError):'Case created',!!stopError);
     }catch(e){if(saved)$('case-dialog').close();throw e;}
     finally{caseSaving=false;updateSetup();$('case-save-state').textContent='Materials and notes will be grouped in this case.';}
     await processInbox();
   })().catch(reportError);
 });
+$('case-dialog').addEventListener('close',()=>{caseDestination=null;updateSetup();});
 $('case-select').addEventListener('change',()=>{(async()=>{activeCase=$('case-select').value;await setCases();await exclusive(()=>append(root,workspace,activeCase,'case_activated',null,null));page=0;$('details').hidden=true;await refresh();await refreshSource();})().catch(e=>status(errorText(e),true));});
 action('refresh-source',refreshSource);
 action('grant-site',()=>chrome.tabs.create({url:'chrome://extensions/?id='+chrome.runtime.id}));
@@ -435,7 +496,7 @@ action('session-start',async()=>{
 });
 action('session-stop',async()=>{await sessionCommand('TV_SESSION_STOP');status('Session stopped and saved.');await refresh();});
 action('session-retry',async()=>{await sessionCommand('TV_SESSION_RETRY');status('Pending session events saved.');await refresh();});
-action('session-journal',()=>{const id=selectedSessionId();if(!id)return;switchView('audit');resetFilters();$('search').value=id;renderList();$('collection').scrollIntoView({block:'start'});});
+action('session-journal',()=>{const id=selectedSessionId();if(!id)return;switchView('audit');resetFilters();$('search').value=id;$('visits-only').checked=true;renderList();$('collection').scrollIntoView({block:'start'});});
 action('session-export',async()=>{await canWrite();const id=selectedSessionId(),c=context();const artifact=await exportSession(c.root,c.workspace,c.caseId,id);status('Session export written and verified: '+artifact.relative_path);await refresh();});
 action('capture-page',()=>runCapture('page'));action('capture-screen',()=>runCapture('screen'));action('capture-full',()=>runCapture('full'));action('capture-pdf',()=>runCapture('pdf'));action('cancel',()=>controller?.abort());
 for(const name of ['highlight','quote','note','entity'])action('selection-'+name,()=>beginAnnotation(name));action('manual-note',()=>beginAnnotation('manual'));
@@ -553,7 +614,7 @@ async function init() {
   if(handle) {
     root=handle;
     if(await root.queryPermission({mode:'readwrite'})==='granted'){await connect(root);if($('status').textContent==="Initializing…")status(activeCase?"Workspace connected":"Workspace connected. Create a case");}
-    else {await renderFolder();status("Restore folder access to reconnect your workspace before creating a case or saving materials.",true);}
+    else {await renderFolder();status("Restore folder access to continue the previous case, or choose New case for a different destination.",true);}
   } else status("Choose a folder, then create a case");
   await refreshShortcuts();await refreshSource();await processInbox();
 }

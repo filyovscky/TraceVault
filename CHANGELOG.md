@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — visits, manual comparison and independent new-case setup, 29.10.2026
+
+- Stop recording same-address History API replacements, title updates and anchor-only movement. Actual SPA address changes remain Page visited navigation records; document/back/reload visits stay supported. The investigation path defaults to visited pages; raw lifecycle/provenance remains inspectable and exportable. Existing evidence is untouched.
+- Add manual verified text comparison between saved HTML versions of the same final URL/case. Results show additions/removals, source hashes and exact acquisition times. No live monitoring or schedule; layout/assets/frames are outside this text comparison. Bounded source/line/table/result sizes and explicit coarse fallback.
+- New case can choose an independent destination when an old folder is inaccessible or single-case. An occupied single-case selection gets a fresh child workspace. Original files are preserved; the current-window stop option is visible. Failed old-session saves remain pending instead of blocking case creation or being discarded. New cases open Materials with fresh filters.
+- No new permissions, runtime dependencies or changes to existing artifact bytes/public export schemas.
 ## 0.6.0 — Focus interface, 28.10.2026
 
 - Compact case picker and current-page block, one labelled Save page action, full-page PNG/PDF icons and a disclosure for visible-area PNG, refresh and capture notes.
