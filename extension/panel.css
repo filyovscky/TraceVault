@@ -68,3 +68,5 @@ body.workspace #collection{grid-column:2;grid-row:1/span 3}body.workspace #detai
 #collection[data-path=true] #collection-title{position:static;width:auto;height:auto;margin:0 0 10px;clip-path:none;overflow:visible;white-space:normal;font-size:13px}
 
 .bookmark-tools{margin-top:8px;gap:6px}#collection nav{display:grid;gap:4px;grid-template-columns:repeat(4,minmax(0,1fr))}#collection nav button{width:100%!important;gap:3px;font-size:11px;padding:4px 0}#collection nav .icon{display:none}.capture-tools{grid-template-columns:minmax(0,1fr) 30px 30px 30px 24px;gap:4px}
+
+.route-item{position:relative;padding-right:34px}.route-item .route-remove{position:absolute;right:0;top:10px;width:28px;min-width:28px;height:28px;padding:5px;border:0;background:transparent;opacity:0;pointer-events:none}.route-item:hover .route-remove,.route-item:focus-within .route-remove{opacity:1;pointer-events:auto}.route-item[data-removed=true] .item-title{color:var(--muted)}@media(hover:none){.route-item .route-remove{opacity:1;pointer-events:auto}}

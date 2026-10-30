@@ -78,3 +78,9 @@ test('bookmarks reject executable and browser URLs before disk access',async()=>
   const root=new Proxy({},{get(){throw new Error('Unexpected disk access');}});
   for(const url of ['javascript:alert(1)','chrome://extensions','file:///C:/secret','not-a-url'])await assert.rejects(saveBookmark(root,{mode:'workspace'},'case',{url}));
 });
+
+test('route removal is a separate reversible record; original acquired events stay intact',()=>{
+  const original={schema_version:1,event_id:'audit-id',sequence:1,action:'navigation_recorded',record_type:null,value:null,details:{event:{event_id:'visit-id',type:'navigation',url:'https://example.org/'}}},edit={schema_version:1,sequence:2,record_type:'routeEdits',value:{navigation_event_id:'visit-id',session_id:'session',removed:true,updated_at:'2026-10-30T12:00:00.000Z'}};
+  const state=foldEvents([original,edit]);assert.equal(state.routeEdits['visit-id'].removed,true);assert.deepEqual(state.audit[0],original);assert.equal(makeExport(state,{}).route_edits[0].removed,true);
+  const restored=foldEvents([original,edit,{...edit,sequence:3,value:{...edit.value,removed:false}}]);assert.equal(restored.routeEdits['visit-id'].removed,false);assert.equal(restored.audit.length,3);assert.equal(foldEvents([original]).routeEdits['visit-id'],undefined);
+});

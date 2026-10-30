@@ -14,6 +14,7 @@ const schemas={
 schemas.Bookmark=object({...common,bookmark_id:id,case_id:id,source_url:{type:'string',pattern:'^https?://'},title:str,created_at:timestamp,time_context:object({timezone_id:str,local_offset_minutes:{type:'integer'},clock_source:{const:'system_clock'}}),deleted:{type:'boolean'}});
 schemas.Capture.properties.bookmark_id=id;
 schemas.OSINTchartExport=object({...common,format:{const:'tracevault-osintchart'},exported_at:timestamp,case:object({schema_version:{const:1},case_id:id,title:str,code:str,created_at:timestamp}),entities:array({$ref:'EntityDraft.schema.json'}),evidence:array({$ref:'Capture.schema.json'}),evidence_refs:array({$ref:'EvidenceReference.schema.json'}),annotations:array({$ref:'Annotation.schema.json'}),artifacts:array(artifact),relations:array({type:'object'})});
+schemas.OSINTchartExport.properties.route_edits=array(object({navigation_event_id:id,session_id:id,removed:{type:'boolean'},updated_at:timestamp}));
 schemas.OSINTchartExport.properties.bookmarks=array({$ref:'Bookmark.schema.json'});
 await mkdir('schemas',{recursive:true});
 for(const [name,schema] of Object.entries(schemas))await writeFile(`schemas/${name}.schema.json`,JSON.stringify({$schema:'http://json-schema.org/draft-07/schema#',$id:`${name}.schema.json`,...schema},null,2)+'\n');

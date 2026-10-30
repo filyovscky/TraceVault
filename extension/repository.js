@@ -1,3 +1,4 @@
+import {isSessionVisit} from './visits.js';
 import {directory, readJSON, exists, writeNew} from './storage.js';
 import {now, uuid, foldEvents, SCHEMA,clock} from './domain.js';
 function workspaceMode(workspace){
@@ -94,4 +95,14 @@ export async function saveBookmark(root,workspace,caseId,source){
   if(existing)return existing;
   const bookmark={schema_version:1,bookmark_id:uuid(),case_id:caseId,source_url:url.href,title:source.title || url.href,created_at:now(),time_context:clock(),deleted:false};
   await appendLoaded(root,workspace,caseId,state,'bookmark_created','bookmarks',bookmark);return bookmark;
+}
+
+// Route editing never rewrites the acquired navigation JSON or its audit receipt.
+export async function setVisitRemoved(root,workspace,caseId,eventId,removed){
+  if(typeof removed!=='boolean')throw new Error('Invalid route edit.');
+  const state=await loadState(root,workspace,caseId),record=state.audit.find(e=>e.action==='navigation_recorded' && e.details?.event?.event_id===eventId);
+  if(!record || !isSessionVisit(record.details.event))throw new Error('This record is not a visited page in this case.');
+  if(!!state.routeEdits[eventId]?.removed===removed)return;
+  const value={navigation_event_id:eventId,session_id:record.details.session_id,removed,updated_at:now()};
+  await appendLoaded(root,workspace,caseId,state,removed?'visit_removed':'visit_restored','routeEdits',value);
 }

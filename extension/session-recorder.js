@@ -2,7 +2,7 @@ import {setting,exclusive,writeNew,exists,readFile,readJSON,readVerifiedFile} fr
 import {append,appendLoaded,loadState,casePath} from './repository.js';
 import {uuid,now,clock,sha256,VERSION} from './domain.js';
 import {freezeSessionEvent,parseSessionEvent,sameSessionEvent} from './session-format.js';
-import {pageAddress} from './visits.js';
+import {pageAddress,isSessionVisit} from './visits.js';
 
 const KEY='navigationRecorder';
 const web=url=>/^https?:\/\//u.test(url || '');
@@ -152,7 +152,7 @@ export async function exportSession(root,workspace,caseId,sessionId){
     const state=await loadState(root,workspace,caseId),records=state.audit.filter(e=>e.action==='navigation_recorded' && e.details.session_id===sessionId).sort((a,b)=>a.details.event.sequence-b.details.event.sequence);
     if(!records.length)throw new Error('No saved session events in this case.');
     const events=[];for(const record of records){const bytes=await readVerifiedFile(root,record.details.artifact);events.push({event:JSON.parse(await bytes.text()),artifact:record.details.artifact});}
-    const artifact=await writeNew(root,casePath(workspace,caseId)+`exports/${uuid()}__session.json`,{schema_version:1,format:'tracevault-navigation-session',session_id:sessionId,exported_at:now(),events});
+    const artifact=await writeNew(root,casePath(workspace,caseId)+`exports/${uuid()}__session.json`,{schema_version:1,format:'tracevault-navigation-session',session_id:sessionId,exported_at:now(),events,excluded_event_ids:events.filter(r=>state.routeEdits[r.event.event_id]?.removed).map(r=>r.event.event_id),path:events.filter(r=>isSessionVisit(r.event) && !state.routeEdits[r.event.event_id]?.removed).map(r=>r.event)});
     await append(root,workspace,caseId,'navigation_exported',null,null,{session_id:sessionId,artifact});return artifact;
   });
 }

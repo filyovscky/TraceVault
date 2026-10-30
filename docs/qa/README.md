@@ -1,3 +1,12 @@
+## 0.8.1 — route removal
+
+Installed Chrome, 320 × 900 px, actual recording with a visit row hovered:
+
+- [Light](0.8.1-route-remove-light.png)
+- [Dark](0.8.1-route-remove-dark.png)
+
+The right-side cross is hidden away from hover/focus, shown on hover and keyboard focus, and targets only visited-page rows. Real disk-backed removal, persistence, restore and Undo are covered by `tests/route-edit.e2e.mjs`. No horizontal overflow in the tested view. Physical touch/DPI matrix is not certified here.
+
 ## 0.8.0 — Bookmarks
 
 Actual installed Chrome screenshots at 320 × 900 px from the final passing disk-backed workflow:

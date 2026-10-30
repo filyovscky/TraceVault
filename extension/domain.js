@@ -1,4 +1,4 @@
-export const VERSION = '0.8.0';
+export const VERSION = '0.8.1';
 export const SCHEMA = 1;
 export const ENTITY_TYPES = ['person', 'organization', 'phone', 'email', 'domain', 'ip_address', 'url', 'username', 'location', 'document', 'file', 'hash', 'custom'];
 export const now = () => new Date().toISOString();
@@ -73,14 +73,14 @@ export function makeExport(state, caseInfo) {
   const artifacts = captures.flatMap(c => c.artifacts || []);
   const ids = new Set(artifacts.map(a=>a.artifact_id));
   for (const r of refs) if (r.artifact_id && !ids.has(r.artifact_id)) throw new Error("Reference to a missing artifact: "+r.reference_id);
-  return {schema_version:SCHEMA, format:'tracevault-osintchart', exported_at:now(), case:caseInfo, entities, evidence:captures, evidence_refs:refs, relations:[], bookmarks:Object.values(state.bookmarks || {}).filter(b=>!b.deleted), annotations:Object.values(state.annotations).filter(a=>!a.deleted), artifacts};
+  return {schema_version:SCHEMA, format:'tracevault-osintchart', exported_at:now(), case:caseInfo, entities, evidence:captures, evidence_refs:refs, relations:[], route_edits:Object.values(state.routeEdits || {}), bookmarks:Object.values(state.bookmarks || {}).filter(b=>!b.deleted), annotations:Object.values(state.annotations).filter(a=>!a.deleted), artifacts};
 }
 export function foldEvents(events) {
-  const state = {captures:{}, bookmarks:{}, annotations:{}, entities:{}, refs:{}, audit:[]};
+  const state = {captures:{}, routeEdits:{}, bookmarks:{}, annotations:{}, entities:{}, refs:{}, audit:[]};
   for (const e of events.sort((a,b)=>a.sequence-b.sequence)) {
     if (e.schema_version !== SCHEMA) throw new Error("Incompatible journal version");
     if (e.record_type && state[e.record_type]) {
-      const key = {captures:'capture_id', bookmarks:'bookmark_id', annotations:'annotation_id', entities:'entity_id', refs:'reference_id'}[e.record_type];
+      const key = {captures:'capture_id', bookmarks:'bookmark_id', routeEdits:'navigation_event_id', annotations:'annotation_id', entities:'entity_id', refs:'reference_id'}[e.record_type];
       if (!key || !e.value?.[key]) throw new Error("Invalid journal entry");
       state[e.record_type][e.value[key]] = e.value;
     }

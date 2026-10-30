@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 — 2026-10-30
+
+- Add a right-side hover/focus cross to remove an individual recorded page visit from History and the investigation path.
+- Add Undo and persistent Show removed steps / Restore step. Original navigation files stay intact; editing works during recording.
+- Session exports add edited `path` and `excluded_event_ids` while retaining verified raw events. Case exports include route edit state.
+- No new permissions or dependencies.
+
 ## 0.8.0 — 2026-10-30
 
 - Added case-local Bookmarks with duplicate prevention and disk journal persistence.

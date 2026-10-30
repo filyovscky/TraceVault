@@ -1,5 +1,5 @@
 import {setting,prepareWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
-import {listCases,createCase,loadState,recover,append,casePath,saveBookmark} from './repository.js';
+import {listCases,createCase,loadState,recover,append,casePath,saveBookmark,setVisitRemoved} from './repository.js';
 import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
@@ -13,7 +13,7 @@ let root=null,workspace=null,cases=[],activeCase=null,state={captures:{},annotat
 let preferences={theme:'system',paused:false,hiddenAnnotationDomains:[],maxBytes:64*1024*1024,annotations:true,screenshotStorage:'compact'};
 const statuses={};
 const sessionId=uuid();
-const filterIds=['search','type-filter','status-filter','annotation-type-filter','domain-filter','date-filter','current-page-only','visits-only'];
+const filterIds=['search','type-filter','status-filter','annotation-type-filter','domain-filter','date-filter','current-page-only','visits-only','show-removed-visits'];
 const viewFilters={};
 function resetFilters(){for(const id of filterIds){const input=$(id);if(input.type==='checkbox')input.checked=false;else input.value='';}page=0;renderList();}
 function focusSearch(){if(!activeCase)return;$('details').hidden=true;selectedId=null;renderList();$('search').focus();$('search').select();}
@@ -260,7 +260,7 @@ function listTime(value){const date=new Date(value);return Number.isFinite(date.
 function renderList() {
   renderSession();
   $('collection').dataset.collectionView=view;
-  const pathOnly=view==='audit' && $('visits-only').checked;$('collection').dataset.path=String(pathOnly);$('visits-only-label').hidden=view!=='audit';
+  const pathOnly=view==='audit' && $('visits-only').checked;$('collection').dataset.path=String(pathOnly);$('visits-only-label').hidden=view!=='audit';$('show-removed-visits-label').hidden=view!=='audit';
   for(const key of ['captures','bookmarks','annotations','audit']){
     const control=document.querySelector(`nav [data-view="${key}"]`);let count=control.querySelector('.view-count');
     if(!count){count=el('span',undefined,'view-count');count.setAttribute('aria-hidden','true');control.append(count);}
@@ -272,8 +272,9 @@ function renderList() {
   const query=$('search').value.trim().toLocaleLowerCase('en'),type=$('type-filter').value,filter=$('status-filter').value,domain=$('domain-filter').value.trim().toLowerCase(),date=$('date-filter').value;
   let rows=Object.values(state[view] || {});
   if(['annotations','bookmarks'].includes(view))rows=rows.filter(a=>!a.deleted);
+  if(view==='audit' && !$('show-removed-visits').checked)rows=rows.filter(r=>!visitRemoved(r));
   const total=rows.length;
-  const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,pathOnly,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
+  const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,pathOnly,view==='audit' && $('show-removed-visits').checked,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
   $('filter-count').textContent=activeFilters?` · ${activeFilters} active`:'';
   $('reset-filters').disabled=!activeFilters;
   const annotationCounts=[['text_highlight','highlight'],['quote','quote'],['note','note']].map(([type,label])=>{const count=rows.filter(r=>r.type===type).length;return `${count} ${label}${count===1?'':'s'}`;}).join(' · ');
@@ -302,7 +303,7 @@ function renderList() {
     else {title=row.action;meta=listTime(row.recorded_at);}
     const metadata=el('span',meta,'item-meta'),at=row.times?.capture_started_at || row.details?.event?.observed_at || row.created_at || row.recorded_at;if(at)metadata.title=localTime(at);
     for(const {url,label}of urls){const line=el('span',undefined,'url-line'),value=el('span');if(label)line.append(el('span',label,'url-label'));setUrl(value,url,false);line.append(value);metadata.append(line);}
-    b.append(el('span',title,'item-title'),metadata);item.append(b);if(view==='bookmarks')item.append(bookmarkTools(row));$('list').append(item);
+    b.append(el('span',title,'item-title'),metadata);item.append(b);if(view==='audit' && row.action==='navigation_recorded' && isSessionVisit(row.details.event)){item.classList.add('route-item');item.dataset.navigationEvent=row.details.event.event_id;item.dataset.removed=String(visitRemoved(row));if(visitRemoved(row))b.querySelector('.item-title').prepend('Removed · ');const remove=button(visitRemoved(row)?'Restore step':'Remove step from history',()=>editVisit(row,!visitRemoved(row)));setActionLabel(remove,visitRemoved(row)?'Restore step':'Remove step from history',visitRemoved(row)?'undo':'close');remove.classList.add('route-remove');item.append(remove);}if(view==='bookmarks')item.append(bookmarkTools(row));$('list').append(item);
   }
   if(!rows.length){
     const empty=el('div',undefined,'empty');
@@ -382,7 +383,7 @@ for(const id of ['compare-before','compare-after'])$(id).addEventListener('chang
 $('comparison-dialog').addEventListener('close',()=>{comparisonRevision++;comparison=null;$('compare-result').replaceChildren();$('compare-files').replaceChildren();});
 function showAnnotation(id) {
   const a=state.annotations[id];if(!a)return;const box=details("Annotation",id);box.append(el('blockquote',a.selection?.exact || ''),el('p',a.note));const dl=el('dl');field(dl,"Created",localTime(a.created_at));field(dl,"Updated",localTime(a.updated_at));field(dl,"Anchor status",t(statuses[id] || a.reattachment_status));field(dl,"Tags",a.tags.join(', '));box.append(dl);referenceDetails(box,state.refs[a.reference_id]);
-  const row=el('div',undefined,'actions');row.append(button("Edit",()=>editAnnotation(a)),button(a.hidden?"Show":"Hide",async()=>{await updateAnnotation(root,workspace,a.case_id,id,{hidden:!a.hidden});await refresh();await refreshSource();showAnnotation(id);}),button("Go to selection",async()=>{await refreshSource();if(tab?.url!==a.source_url)throw new Error("Open the original URL first");const result=await chrome.tabs.sendMessage(tab.id,{type:'TV_SCROLL',id});status(t(result.status));}),button("Delete annotation",async()=>{const c={...context(),caseId:a.case_id};await updateAnnotation(c.root,c.workspace,c.caseId,id,{deleted:true});lastDeleted={...c,id};$('undo-delete').hidden=false;await refresh();$('details').hidden=true;status("Annotation removed from the list. Undo is available.");}));box.append(row);
+  const row=el('div',undefined,'actions');row.append(button("Edit",()=>editAnnotation(a)),button(a.hidden?"Show":"Hide",async()=>{await updateAnnotation(root,workspace,a.case_id,id,{hidden:!a.hidden});await refresh();await refreshSource();showAnnotation(id);}),button("Go to selection",async()=>{await refreshSource();if(tab?.url!==a.source_url)throw new Error("Open the original URL first");const result=await chrome.tabs.sendMessage(tab.id,{type:'TV_SCROLL',id});status(t(result.status));}),button("Delete annotation",async()=>{const c={...context(),caseId:a.case_id};await updateAnnotation(c.root,c.workspace,c.caseId,id,{deleted:true});lastDeleted={...c,id};setActionLabel($('undo-delete'),'Undo annotation deletion','undo');$('undo-delete').hidden=false;await refresh();$('details').hidden=true;status("Annotation removed from the list. Undo is available.");}));box.append(row);
 }
 function editAnnotation(a) {
   pending={...context(),caseId:a.case_id,editId:a.annotation_id,selection:a.selection,action:'edit',tabId:null};$('annotation-title').textContent="Edit annotation";$('quote-preview').textContent=a.selection?.exact || "No quote";$('reference-state').textContent="The original evidence reference is preserved";$('archive-first').hidden=true;$('annotation-note').value=a.note;$('annotation-color').value=a.appearance.color_token;$('annotation-tags').value=a.tags.join(', ');$('entity-fields').hidden=true;$('annotation-dialog').showModal();
@@ -397,6 +398,7 @@ function showAudit(event) {
   const value=event.details.event,artifact=event.details.artifact,box=details(navigationNames[value.type] || value.type,event.event_id),dl=el('dl');
   field(dl,'Observed',localTime(value.observed_at));field(dl,'UTC',value.observed_at);field(dl,'Session ID',value.session_id);field(dl,'Previous URL',value.previous_url);field(dl,'Title',value.title);field(dl,'Reason',value.reason);field(dl,'File',artifact.relative_path);field(dl,'SHA-256',artifact.sha256,'hash');box.append(dl);
   if(value.url)box.append(link(value.url,'Open recorded URL'));
+  if(isSessionVisit(value))box.append(button(visitRemoved(event)?'Restore step':'Remove step from history',()=>editVisit(event,!visitRemoved(event)),true));
   box.append(button('Verify checksum',async()=>{const result=await verifyArtifact(root,workspace,event.case_id,artifact);status(result.ok?'SHA-256 verified':'Session event checksum mismatch',!result.ok);}));
   const raw=el('details');raw.append(el('summary','Event metadata'),el('pre',JSON.stringify(value,null,2)));box.append(raw);
 }
@@ -448,7 +450,7 @@ async function contextHighlight(command){
   const c={...context(),caseId:command.caseId},fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId)),a=fresh.annotations[command.annotationId];
   if(!a || a.deleted || a.type!=='text_highlight' || a.source_url!==source.url)throw new Error('This highlight is no longer available in its original case.');
   if(command.action==='edit-highlight'){editAnnotation(a);return;}
-  await updateAnnotation(c.root,c.workspace,c.caseId,a.annotation_id,{deleted:true});lastDeleted={...c,id:a.annotation_id};$('undo-delete').hidden=false;await refresh();await refreshSource();$('details').hidden=true;status('Highlight deleted. Undo is available.');
+  await updateAnnotation(c.root,c.workspace,c.caseId,a.annotation_id,{deleted:true});lastDeleted={...c,id:a.annotation_id};setActionLabel($('undo-delete'),'Undo annotation deletion','undo');$('undo-delete').hidden=false;await refresh();await refreshSource();$('details').hidden=true;status('Highlight deleted. Undo is available.');
   await chrome.tabs.sendMessage(command.tabId,{type:'TV_FEEDBACK',message:'Highlight deleted. Undo is available in TraceVault.'}).catch(()=>{});
 }
 action('pick-root',async()=>{const handle=await showDirectoryPicker({mode:'readwrite',id:'tracevault'}),result=await connect(handle,$('workspace-mode').value,{createChild:true});status(result.createdIn?`Created workspace: ${result.folderLabel}`:"Folder access verified by writing and reading a test file");});
@@ -523,7 +525,7 @@ $('theme').addEventListener('change',()=>{document.documentElement.dataset.theme
 action('save-settings',async()=>{const mb=Number($('max-size').value);if(!Number.isFinite(mb) || mb<1 || mb>256)throw new Error("Limit: 1–256 MB");if($('paused').checked && navigationState?.status==='recording')await sessionCommand('TV_SESSION_STOP');preferences={...preferences,theme:$('theme').value,paused:$('paused').checked,annotations:$('annotations-toggle').checked,maxBytes:mb*1024*1024,screenshotStorage:$('screenshot-storage').value};await setting('preferences',preferences);renderSession();await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();$('settings').close();status("Settings saved");});
 async function toggleAnnotations(){preferences.annotations=!preferences.annotations;$('annotations-toggle').checked=preferences.annotations;await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();status(preferences.annotations?'Annotations enabled':'Annotations hidden');}
 action('site-annotations',async()=>{const host=new URL(tab.url).hostname;preferences.hiddenAnnotationDomains=preferences.hiddenAnnotationDomains.includes(host)?preferences.hiddenAnnotationDomains.filter(h=>h!==host):[...preferences.hiddenAnnotationDomains,host];await setting('preferences',preferences);await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);await refreshSource();});
-action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh();await refreshSource();status("Annotation restored in its original case");});
+action('undo-delete',async()=>{if(!lastDeleted)return;const c=lastDeleted;if(c.kind==='visit')await exclusive(()=>setVisitRemoved(c.root,c.workspace,c.caseId,c.id,false));else await updateAnnotation(c.root,c.workspace,c.caseId,c.id,{deleted:false});lastDeleted=null;$('undo-delete').hidden=true;await refresh({annotations:c.kind!=='visit'});if(c.kind!=='visit')await refreshSource();status(c.kind==='visit'?"Step restored in its original case":"Annotation restored in its original case");});
 action('reset-filters',resetFilters);
 $('current-page-only').addEventListener('change',()=>{page=0;renderList();});
 const commandActions=[
@@ -660,4 +662,18 @@ async function captureBookmark(bookmark,kind){
     busy=false;
     await runCapture(kind,{tabId:source.id,caseId:c.caseId,sourceUrl:source.url,bookmarkId:bookmark.bookmark_id});
   }finally{bookmarkOperation=false;busy=false;updateSetup();renderList();}
+}
+
+function visitRemoved(record){return record.action==='navigation_recorded' && !!state.routeEdits?.[record.details?.event?.event_id]?.removed;}
+let routeSaving=false;
+async function editVisit(record,removed){
+  if(routeSaving)return;if(busy)throw new Error('Wait for the current operation.');const c=context(),id=record.details.event.event_id;
+  if(c.caseId!==record.case_id)throw new Error('Open this step’s original case.');routeSaving=true;
+  try{
+    await canWrite();if(root!==c.root || activeCase!==c.caseId)throw new Error('The active case changed. Try again.');
+    await exclusive(()=>setVisitRemoved(c.root,c.workspace,c.caseId,id,removed));
+    if(removed){lastDeleted={...c,id,kind:'visit'};setActionLabel($('undo-delete'),'Undo step removal','undo');$('undo-delete').hidden=false;}
+    if(root===c.root && activeCase===c.caseId){if(selectedId===record.event_id){selectedId=null;$('details').hidden=true;}await refresh({annotations:false});$('list .item-button')?.focus();}
+    status(removed?'Step removed from history. Undo is available.':'Step restored.');
+  }finally{routeSaving=false;}
 }

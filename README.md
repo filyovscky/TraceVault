@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.8.0](releases/TraceVault-0.8.0.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.8.1](releases/TraceVault-0.8.1.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.8.0. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.8.0 add no permissions.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.8.1. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.8.1 add no permissions.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** to continue the old case, or **Case actions → New case** to choose a different destination. Existing files stay in their original folder.
 
@@ -110,3 +110,11 @@ Use the ribbon icon beside **Save page** to bookmark the current HTTP/HTTPS page
 Each bookmark has **Save HTML**, **Save PDF** and **Save full-page PNG** icon buttons with English tooltips. They activate a matching tab in the current window (preserving its live state), or open the address and wait up to 30 seconds for loading. The resulting capture links back to the bookmark and has its own source URL, acquisition times and verified files. Redirect destinations are recorded by the capture. Authentication, restricted pages, changing sites and expired links can prevent capture; a bookmark alone cannot recover lost content.
 
 Click a bookmark to see its URL, addition time, saved copies and delete action. Deleting a bookmark hides the reference and leaves its audit history and all captured files intact. Bookmarks live in the case journal on disk and are included in case JSON exports. No Chrome bookmarks permission or browser bookmark access is used.
+
+### Remove a route step
+
+In History or the session journal, hover a recorded page visit and click the **×** at its right edge (**Remove step from history**). The control also appears with keyboard focus, and remains visible on touch devices. It removes only that occurrence, including while recording continues. Technical lifecycle records have no removal control.
+
+**Undo step removal** restores the last removed step. After reopening the panel, use **Filters → Show removed steps**, then the row’s **Restore step** button. Changes persist in the case journal. Acquired navigation JSON files, original sequence numbers, hashes, timestamps and prior exports remain unchanged.
+
+New session JSON exports provide the edited visit list in `path` and exclusion IDs in `excluded_event_ids`. The existing `events` array retains the verified acquisition record for provenance; it includes excluded events. Raw `previous_url` fields still describe actual browser transitions. Case JSON exports include the current `route_edits` state. Old exports remain unchanged on disk.
