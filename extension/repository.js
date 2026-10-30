@@ -86,3 +86,12 @@ export async function recover(root,workspace,cases) {
   }
   return count;
 }
+
+// Bookmarks are references, never an assertion that page contents were archived.
+export async function saveBookmark(root,workspace,caseId,source){
+  const url=new URL(source.url);if(!['http:','https:'].includes(url.protocol))throw new Error('Bookmarks support HTTP/HTTPS only.');
+  const state=await loadState(root,workspace,caseId),existing=Object.values(state.bookmarks).find(b=>!b.deleted && b.source_url===url.href);
+  if(existing)return existing;
+  const bookmark={schema_version:1,bookmark_id:uuid(),case_id:caseId,source_url:url.href,title:source.title || url.href,created_at:now(),time_context:clock(),deleted:false};
+  await appendLoaded(root,workspace,caseId,state,'bookmark_created','bookmarks',bookmark);return bookmark;
+}

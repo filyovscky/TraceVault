@@ -19,14 +19,15 @@ export async function broadcastAnnotations(caseId,state,enabled,hiddenDomains=[]
   const tabs=await chrome.tabs.query({});
   await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'TV_RENDER',annotations:cache[caseId].filter(a=>a.source_url===tab.url),enabled:enabled && !hiddenDomains.some(host=>{try{return new URL(tab.url).hostname===host;}catch{return false;}})})));
 }
-export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page',imageUrl=null,settings={},signal,onProgress=()=>{}}) {
+export async function capture({root,workspace,caseId,tabId,id=uuid(),kind='page',imageUrl=null,bookmarkId=null,settings={},signal,onProgress=()=>{}}) {
   return exclusive(async()=>{
     const tab=await chrome.tabs.get(tabId);assertWebTab(tab,settings);
     let state=await loadState(root,workspace,caseId);
     if(state.captures[id]) return state.captures[id];
+    if(bookmarkId && (!state.bookmarks[bookmarkId] || state.bookmarks[bookmarkId].deleted))throw new Error('Bookmark is no longer available in this case.');
     const sequence=Object.keys(state.captures).length+1;
     const start=now(),monotonic=performance.now();
-    let record={schema_version:1,capture_id:id,evidence_number:'EVD-'+String(sequence).padStart(6,'0'),case_id:caseId,kind:kind==='page'?'webpage':kind==='image'?'image':'screenshot',capture_request:kind,source:{original_url:tab.url,final_url:tab.url,title:tab.title || tab.url,origin:new URL(tab.url).origin},times:{capture_started_at:start,first_seen_at:Object.values(state.captures).find(c=>c.source.original_url===tab.url)?.times.first_seen_at || start,...clock()},state:'queued',capture_status:'pending',collector_version:VERSION,artifacts:[],warnings:[],previous_capture_id:Object.values(state.captures).filter(c=>c.source.final_url===tab.url).at(-1)?.capture_id || null};
+    let record={schema_version:1,capture_id:id,evidence_number:'EVD-'+String(sequence).padStart(6,'0'),case_id:caseId,kind:kind==='page'?'webpage':kind==='image'?'image':'screenshot',capture_request:kind,...(bookmarkId?{bookmark_id:bookmarkId}:{}),source:{original_url:tab.url,final_url:tab.url,title:tab.title || tab.url,origin:new URL(tab.url).origin},times:{capture_started_at:start,first_seen_at:Object.values(state.captures).find(c=>c.source.original_url===tab.url)?.times.first_seen_at || start,...clock()},state:'queued',capture_status:'pending',collector_version:VERSION,artifacts:[],warnings:[],previous_capture_id:Object.values(state.captures).filter(c=>c.source.final_url===tab.url).at(-1)?.capture_id || null};
     const save=async(action,patch)=>{record={...record,...patch};await append(root,workspace,caseId,action,'captures',record);onProgress(record.state);};
     await save('capture_started',{state:'capturing'});
     let hidden=false;

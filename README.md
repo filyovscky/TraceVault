@@ -4,9 +4,9 @@ A local Chrome Manifest V3 extension for capturing web evidence with SHA-256, so
 
 ## Install or update
 
-1. Extract [TraceVault 0.7.0](releases/TraceVault-0.7.0.zip) to a permanent folder, or build `dist` from this repository.
+1. Extract [TraceVault 0.8.0](releases/TraceVault-0.8.0.zip) to a permanent folder, or build `dist` from this repository.
 2. In `chrome://extensions`, enable Developer mode and select **Load unpacked** → the folder containing `manifest.json`.
-3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.7.0. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.7.0 add no permissions.
+3. To update, replace files in the folder Chrome already loads, click **Reload ↻** on its extension card, then reopen the panel and refresh already-open source tabs. The version should read 0.8.0. Updates from before 0.5.0 add `webNavigation` for the implemented session recorder; Chrome may require permission approval or re-enabling. Updates from 0.4.3 or earlier also add all-site access. Versions 0.5.1–0.8.0 add no permissions.
 4. Pin TraceVault and click its icon on an HTTP/HTTPS page. Chrome controls which side hosts its panel.
 5. Follow **Folder → Case → Capture**. Choose a folder: if it contains other files but no workspace.json, TraceVault creates a separate TraceVault subfolder (or TraceVault-2, etc. when names are occupied). Empty folders and existing TraceVault workspaces are used directly. Access is checked with a real write/read/delete probe. Enter a case title; leave the optional code blank to assign the next free CASE-001, CASE-002, etc., or enter your own code. The form identifies the destination folder. When the panel says **Ready**, capture and annotation actions become available. The actual workspace subfolder is remembered for subsequent launches. If Chrome has lost folder access, use **Restore folder access** to continue the old case, or **Case actions → New case** to choose a different destination. Existing files stay in their original folder.
 
@@ -21,8 +21,8 @@ Long URL displays keep their beginning and ending on one line, with a middle ell
 | Location | Actions |
 | --- | --- |
 | Header | Case actions menu, Settings |
-| Current page | **Save page** (HTML), full-page PNG, PDF; more capture options for visible-area PNG, refresh and capture notes |
-| Case sections | Materials, Highlights, History; counts show saved records before filtering |
+| Current page | **Save page** (HTML), bookmark current page, full-page PNG, PDF; more capture options for visible-area PNG, refresh and capture notes |
+| Case sections | Materials, Bookmarks, Highlights, History; counts show saved records before filtering |
 | Case actions menu | New case, Entities, export JSON, selected-text tools, Commands, workspace tab and folder |
 | Bottom bar | Start/Stop window history; session journal and JSON export in Session actions |
 
@@ -102,3 +102,11 @@ python scripts/package.py
 E2E uses isolated profiles and actual disk folders under `output/playwright`. Directory selection is automated with a native FSA handle supplied by CDP; only the QA profile pre-allows writes. Native OS picker/permission bubbles are not automated. The installed-Chrome tests use the standard Windows path; elsewhere add `--grep-invert "installed Chrome"`.
 
 SingleFile is not bundled. There are no runtime third-party dependencies. [Dependency licenses](docs/LICENSES.md), [architecture](docs/ARCHITECTURE.md), [acceptance limits](docs/P0-STATUS.md), [test results](docs/TEST-REPORT.md), [UI plan](docs/UI-0.4-PLAN.md), [screenshots](docs/qa/README.md). [Features in development](docs/development/README.md) are separate from released functionality. Earlier engineering logs and the archived original specification remain in Russian. P0 is a tested MVP candidate; OCR, visual/image diff, scheduled monitoring, video, trusted timestamps, encryption and a native bridge are not implemented.
+
+### Bookmarks
+
+Use the ribbon icon beside **Save page** to bookmark the current HTTP/HTTPS page in the active case. **Bookmarks** keeps these links separate from saved evidence. No page contents are captured at this stage. The same full URL is deduplicated within the case.
+
+Each bookmark has **Save HTML**, **Save PDF** and **Save full-page PNG** icon buttons with English tooltips. They activate a matching tab in the current window (preserving its live state), or open the address and wait up to 30 seconds for loading. The resulting capture links back to the bookmark and has its own source URL, acquisition times and verified files. Redirect destinations are recorded by the capture. Authentication, restricted pages, changing sites and expired links can prevent capture; a bookmark alone cannot recover lost content.
+
+Click a bookmark to see its URL, addition time, saved copies and delete action. Deleting a bookmark hides the reference and leaves its audit history and all captured files intact. Bookmarks live in the case journal on disk and are included in case JSON exports. No Chrome bookmarks permission or browser bookmark access is used.

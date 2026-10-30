@@ -1,5 +1,6 @@
 // Original, dependency-free 24 px stroke icons. Never render source/user HTML.
 const paths={
+  bookmark:'M6 3h12v18l-6-4-6 4z',
   command:'M9 7V4a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2v16a2 2 0 1 0 2-2H7a2 2 0 1 0 2 2V7',
   panels:'M3 4h18v16H3zM14 4v16',
   settings:'m10 3-.6 2.2-2 .8-2-.8-2 3.5L5 10v2l-1.6 1.3 2 3.5 2-.8 2 .8.6 2.2h4l.6-2.2 2-.8 2 .8 2-3.5L19 12v-2l1.6-1.3-2-3.5-2 .8-2-.8L14 3zM15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
@@ -26,7 +27,7 @@ const paths={
   pin:'m8 3 8 0-1 7 4 4H5l4-4zm4 11v7',edit:'m15 3 6 6-12 12H3v-6zM12 6l6 6',trash:'M3 6h18M8 6V3h8v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
   target:'M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6m12-3a3 3 0 1 1-6 0 3 3 0 0 1 6 0'
 };
-const labelIcons={'Compare saved versions':'panels','Open archived HTML':'html','Copy PDF path':'copy','Open file':'archive','Verify checksum':'verify','Copy SHA-256':'copy','Export PDF':'export','Export original':'export','Create PDF':'pdf','Copy citation':'quote',Pin:'pin',Unpin:'pin','Capture new version':'refresh',Edit:'edit',Show:'eye',Hide:'eye-off','Go to selection':'target','Delete annotation':'trash'};
+const labelIcons={'Save HTML':'html','Save PDF':'pdf','Save full-page PNG':'scan','Open bookmark':'right','Delete bookmark':'trash','Compare saved versions':'panels','Open archived HTML':'html','Copy PDF path':'copy','Open file':'archive','Verify checksum':'verify','Copy SHA-256':'copy','Export PDF':'export','Export original':'export','Create PDF':'pdf','Copy citation':'quote',Pin:'pin',Unpin:'pin','Capture new version':'refresh',Edit:'edit',Show:'eye',Hide:'eye-off','Go to selection':'target','Delete annotation':'trash'};
 export function icon(name){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   for(const [key,value]of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false',class:'icon'}))svg.setAttribute(key,value);

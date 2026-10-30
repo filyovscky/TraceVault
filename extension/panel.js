@@ -1,5 +1,5 @@
 import {setting,prepareWorkspace,exclusive,readVerifiedFile,writeNew} from './storage.js';
-import {listCases,createCase,loadState,recover,append,casePath} from './repository.js';
+import {listCases,createCase,loadState,recover,append,casePath,saveBookmark} from './repository.js';
 import {uuid,localTime,ENTITY_TYPES,normalize,assertWebTab,hostPattern,sha256,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from './domain.js';
 import {capture,selected,inject,broadcastAnnotations,saveAnnotation,saveEntity,updateAnnotation,verifyArtifact,exportCase,convertScreenshotToPdf} from './service.js';
 import {t} from './i18n.js';
@@ -27,6 +27,7 @@ function switchView(next){
 let syncRevision=0,lastDeleted=null,sourceRevision=0,sourceTimer;
 let initializing=true,connecting=false,caseSaving=false,folderPermission='prompt',folderLabel='';
 let caseDestination=null,casePicking=false;
+let bookmarkOperation=false;
 let comparison=null,comparing=false,comparisonRevision=0;
 let navigationState=null,recorderBusy=false,ownWindowId=null,sessionRefreshTimer;
 const navigationNames={session_started:'Session started',session_stopped:'Session stopped',tab_snapshot:'Initial page',navigation:'Page visited',history_state:'Page visited',fragment:'Page anchor (legacy)',tab_entered:'Page entered this window',tab_left:'Tab left',tab_activated:'Tab visited',page_title:'Page title (legacy)',link_target:'Linked tab'};
@@ -69,9 +70,10 @@ function updateSetup(){
   $('create-case').disabled=locked || casePicking || !caseDestination;
   $('case-folder').disabled=locked || casePicking;
   $('case-title').readOnly=caseSaving;$('case-code').readOnly=caseSaving;
-  for(const id of ['capture-page','capture-screen','capture-full','capture-pdf','selection-highlight','selection-quote','selection-note','selection-entity','manual-note','export-case','archive-first'])$(id).disabled=locked || busy || !ready;
+  for(const id of ['bookmark-page','capture-page','capture-screen','capture-full','capture-pdf','selection-highlight','selection-quote','selection-note','selection-entity','manual-note','export-case','archive-first'])$(id).disabled=locked || busy || !ready;
   for(const id of ['pick-root','change-root','reauthorize'])$(id).disabled=locked || busy;
   document.querySelectorAll('[data-view]').forEach(b=>b.disabled=!ready || locked);
+  document.querySelectorAll('.bookmark-tools button[data-capture]').forEach(b=>b.disabled=locked || busy || bookmarkOperation || !ready);
   renderSession();
 }
 function openCaseDialog(){
@@ -121,8 +123,8 @@ async function canWrite() {
   }else if(needsReconnect)await connect(root);
   await readPreferences();context();
 }
-async function refresh() {
-  if(activeCase && root && await root.queryPermission({mode:'read'})==='granted') {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root){state=fresh;await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);}}
+async function refresh({annotations=true}={}) {
+  if(activeCase && root && await root.queryPermission({mode:'read'})==='granted') {const c=context(),fresh=await exclusive(()=>loadState(c.root,c.workspace,c.caseId));if(activeCase===c.caseId && root===c.root){state=fresh;if(annotations)await broadcastAnnotations(activeCase,state,preferences.annotations,preferences.hiddenAnnotationDomains);}}
   renderList();await renderFolder();
 }
 async function renderFolder() {
@@ -200,7 +202,7 @@ async function runCapture(kind='page',command=null) {
   const source=await chrome.tabs.get(sourceId);assertWebTab(source,preferences);if(source.url!==requested.url)throw new Error("The source changed while requesting access. Try again.");if(command?.sourceUrl && source.url!==command.sourceUrl)throw new Error("The tab URL changed after the command was queued");
   busy=true;controller=new AbortController();$('cancel').hidden=false;setBusy(true);
   try {
-    const result=await capture({...c,tabId:sourceId,id:command?.id,imageUrl:command?.imageUrl,kind,settings:preferences,signal:controller.signal,onProgress:message=>status(t(message))});
+    const result=await capture({...c,tabId:sourceId,id:command?.id,imageUrl:command?.imageUrl,bookmarkId:command?.bookmarkId,kind,settings:preferences,signal:controller.signal,onProgress:message=>status(t(message))});
     if(!['completed','partial'].includes(result.state)){status(`${t(result.state)} · ${result.error || "No verified file"}`,true);return result;}
     status(`${t(result.state)} · ${result.evidence_number} · ${result.artifacts[0].byte_length.toLocaleString('en-US')} bytes`);
     if(c.caseId===activeCase){await refresh();showCapture(result.capture_id);}return result;
@@ -259,23 +261,23 @@ function renderList() {
   renderSession();
   $('collection').dataset.collectionView=view;
   const pathOnly=view==='audit' && $('visits-only').checked;$('collection').dataset.path=String(pathOnly);$('visits-only-label').hidden=view!=='audit';
-  for(const key of ['captures','annotations','audit']){
+  for(const key of ['captures','bookmarks','annotations','audit']){
     const control=document.querySelector(`nav [data-view="${key}"]`);let count=control.querySelector('.view-count');
     if(!count){count=el('span',undefined,'view-count');count.setAttribute('aria-hidden','true');control.append(count);}
-    count.textContent=Object.values(state[key] || {}).filter(r=>key!=='annotations' || !r.deleted).length;
+    count.textContent=Object.values(state[key] || {}).filter(r=>!['annotations','bookmarks'].includes(key) || !r.deleted).length;
   }
-  $('collection-title').textContent=pathOnly?'Investigation path':{captures:'Materials',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
+  $('collection-title').textContent=pathOnly?'Investigation path':{captures:'Materials',bookmarks:'Bookmarks',annotations:'Highlights & notes',entities:'Entities',audit:'History'}[view];
   $('manual-note').hidden=view!=='annotations';
   $('capture-type-label').hidden=view!=='captures';$('capture-status-label').hidden=view!=='captures';$('annotation-type-label').hidden=view!=='annotations';
   const query=$('search').value.trim().toLocaleLowerCase('en'),type=$('type-filter').value,filter=$('status-filter').value,domain=$('domain-filter').value.trim().toLowerCase(),date=$('date-filter').value;
   let rows=Object.values(state[view] || {});
-  if(view==='annotations')rows=rows.filter(a=>!a.deleted);
+  if(['annotations','bookmarks'].includes(view))rows=rows.filter(a=>!a.deleted);
   const total=rows.length;
   const activeFilters=[$('search').value.trim(),domain,date,$('current-page-only').checked,pathOnly,...(view==='captures'?[type,filter]:view==='annotations'?[$('annotation-type-filter').value]:[])].filter(Boolean).length;
   $('filter-count').textContent=activeFilters?` · ${activeFilters} active`:'';
   $('reset-filters').disabled=!activeFilters;
   const annotationCounts=[['text_highlight','highlight'],['quote','quote'],['note','note']].map(([type,label])=>{const count=rows.filter(r=>r.type===type).length;return `${count} ${label}${count===1?'':'s'}`;}).join(' · ');
-  $('collection-description').textContent={captures:`${total} saved record${total===1?'':'s'} in this case`,annotations:annotationCounts,entities:`${total} entit${total===1?'y':'ies'} in this case`,audit:`${total} history event${total===1?'':'s'} in this case`}[view];
+  $('collection-description').textContent={bookmarks:`${total} bookmark${total===1?'':'s'} · Links only until captured`,captures:`${total} saved record${total===1?'':'s'} in this case`,annotations:annotationCounts,entities:`${total} entit${total===1?'y':'ies'} in this case`,audit:`${total} history event${total===1?'':'s'} in this case`}[view];
   rows=rows.filter(r=>{
     if(pathOnly && (r.action!=='navigation_recorded' || !isSessionVisit(r.details?.event)))return false;
     if(query && !JSON.stringify(r).toLocaleLowerCase('en').includes(query))return false;
@@ -289,23 +291,24 @@ function renderList() {
   }).sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned) || (b.times?.capture_started_at || b.created_at || b.recorded_at || '').localeCompare(a.times?.capture_started_at || a.created_at || a.recorded_at || ''));
   const maxPage=Math.max(0,Math.ceil(rows.length/25)-1);page=Math.min(page,maxPage);$('list').replaceChildren();
   for(const row of rows.slice(page*25,page*25+25)) {
-    const id=row.capture_id || row.annotation_id || row.entity_id || row.event_id,item=el('div',undefined,'item'+(selectedId===id?' selected':''));item.setAttribute('role','listitem');
-    const b=button('',()=>view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
+    const id=row.bookmark_id || row.capture_id || row.annotation_id || row.entity_id || row.event_id,item=el('div',undefined,'item'+(selectedId===id?' selected':''));item.setAttribute('role','listitem');
+    const b=button('',()=>view==='bookmarks'?showBookmark(row.bookmark_id):view==='captures'?showCapture(row.capture_id):view==='annotations'?showAnnotation(row.annotation_id):view==='entities'?showEntity(row.entity_id):showAudit(row));b.className='item-button';
     let title,meta;const urls=[];
     if(view==='captures'){title=`${row.pinned?"Pinned · ":''}${row.evidence_number} · ${row.source.title}`;meta=`${row.kind==='webpage'?'HTML':row.capture_scope==='full_page'?"Full PNG":row.kind==='screenshot'?'PNG':"Image"} · ${t(row.state)} · ${listTime(row.times.capture_started_at)}`;urls.push({url:row.source.final_url});}
+    else if(view==='bookmarks'){title=row.title;meta=`Saved copies: ${bookmarkCaptures(row.bookmark_id).length} · ${listTime(row.created_at)}`;urls.push({url:row.source_url});}
     else if(view==='annotations'){title=row.selection?.exact || row.note;meta=`${{text_highlight:'Highlight',quote:'Quote',note:'Note'}[row.type] || 'Annotation'} · ${t(statuses[row.annotation_id] || row.reattachment_status)} · ${listTime(row.created_at)}${row.tags.length?' · '+row.tags.join(', '):''}`;}
     else if(view==='entities'){title=row.label;meta=`${row.entity_type} · unconfirmed · ${row.evidence_refs.length} sources · ${listTime(row.created_at)}`;}
     else if(row.action==='navigation_recorded'){const e=row.details.event;title=`${navigationNames[e.type] || e.type}${e.title?' · '+e.title:''}`;meta=listTime(e.observed_at);if(e.previous_url)urls.push({url:e.previous_url,label:'From'});if(e.url)urls.push({url:e.url,label:e.previous_url?'To':null});}
     else {title=row.action;meta=listTime(row.recorded_at);}
     const metadata=el('span',meta,'item-meta'),at=row.times?.capture_started_at || row.details?.event?.observed_at || row.created_at || row.recorded_at;if(at)metadata.title=localTime(at);
     for(const {url,label}of urls){const line=el('span',undefined,'url-line'),value=el('span');if(label)line.append(el('span',label,'url-label'));setUrl(value,url,false);line.append(value);metadata.append(line);}
-    b.append(el('span',title,'item-title'),metadata);item.append(b);$('list').append(item);
+    b.append(el('span',title,'item-title'),metadata);item.append(b);if(view==='bookmarks')item.append(bookmarkTools(row));$('list').append(item);
   }
   if(!rows.length){
     const empty=el('div',undefined,'empty');
     const filtered=activeCase && total>0 && activeFilters>0;
-    empty.append(el('strong',!activeCase?'Choose a workspace to start':filtered?'No matching records':{captures:'No materials yet',annotations:'No highlights or notes yet',entities:'No entities yet',audit:'No history yet'}[view]));
-    empty.append(el('p',!activeCase?'Choose a folder above, then create or open a case.':filtered?'Your records are still in this case. Clear the filters to see them.':{captures:'Use Save page above for HTML, or choose the full-page PNG or PDF icon.',annotations:'Select text on a website, right-click and choose TraceVault → Highlight selection. A note is optional.',entities:'Select text on a website and use Create entity from selection.',audit:'Saved actions will appear here.'}[view]));
+    empty.append(el('strong',!activeCase?'Choose a workspace to start':filtered?'No matching records':{captures:'No materials yet',bookmarks:'No bookmarks yet',annotations:'No highlights or notes yet',entities:'No entities yet',audit:'No history yet'}[view]));
+    empty.append(el('p',!activeCase?'Choose a folder above, then create or open a case.':filtered?'Your records are still in this case. Clear the filters to see them.':{bookmarks:'Bookmark the current page using the ribbon icon above. Save its contents later as HTML, PDF or PNG.',captures:'Use Save page above for HTML, or choose the full-page PNG or PDF icon.',annotations:'Select text on a website, right-click and choose TraceVault → Highlight selection. A note is optional.',entities:'Select text on a website and use Create entity from selection.',audit:'Saved actions will appear here.'}[view]));
     if(filtered)empty.append(button('Clear filters',resetFilters,true));
     $('list').append(empty);
   }
@@ -325,6 +328,7 @@ function referenceDetails(container,ref) {
 function showCapture(id) {
   const c=state.captures[id];if(!c)return;
   const box=details(c.evidence_number,id),dl=el('dl');
+  if(c.bookmark_id && state.bookmarks?.[c.bookmark_id] && !state.bookmarks[c.bookmark_id].deleted)box.append(button('Open linked bookmark',()=>{switchView('bookmarks');showBookmark(c.bookmark_id);},true));
   field(dl,"Title",c.source.title);field(dl,"Status",t(c.state));field(dl,"Original URL",c.source.original_url);field(dl,"Final URL",c.source.final_url);
   for(const [key,label] of Object.entries({capture_started_at:"Capture started",capture_finished_at:"Acquisition finished",artifact_write_started_at:"File write started",artifact_written_at:"File written",record_created_at:"Record created",first_seen_at:"First seen"})) {field(dl,label,localTime(c.times[key]));if(c.times[key])field(dl,label+' · UTC',c.times[key]);}
   field(dl,"Clock",`${c.times.clock_source} · ${c.times.timezone_id} · offset ${c.times.local_offset_minutes} min. No independent timestamp.`);field(dl,'Capture ID',c.capture_id);field(dl,"Method",c.capture_method);field(dl,"Acquisition duration (monotonic)",c.duration_ms!=null?c.duration_ms+" ms":null);field(dl,"Previous version",c.previous_capture_id);if(c.error)field(dl,"Failed",c.error);if(c.viewport)field(dl,"Tab parameters",JSON.stringify({viewport:c.viewport,pixel_width:c.pixel_width,pixel_height:c.pixel_height,page_zoom:c.page_zoom}));box.append(dl,link(c.source.final_url,"Open source site"));
@@ -621,3 +625,39 @@ async function init() {
 updateSetup();
 refreshSource().catch(()=>{});
 init().catch(reportError).finally(()=>{initializing=false;updateSetup();if(workspace && !cases.length && folderPermission==='granted' && !$('case-dialog').open)openCaseDialog();processInbox().catch(reportError);});
+
+function bookmarkCaptures(id){return Object.values(state.captures).filter(c=>c.bookmark_id===id && ['completed','partial'].includes(c.state));}
+function bookmarkTools(record){
+  const row=el('div',undefined,'actions bookmark-tools');
+  row.setAttribute('role','group');row.setAttribute('aria-label','Bookmark actions');
+  for(const [label,kind]of [['Save HTML','page'],['Save PDF','pdf'],['Save full-page PNG','full']]){const b=button(label,()=>captureBookmark(record,kind));b.dataset.capture=kind;b.disabled=busy || bookmarkOperation;row.append(b);}
+  row.append(button('Open bookmark',()=>chrome.tabs.create({url:record.source_url,active:true})));
+  return row;
+}
+function showBookmark(id){
+  const b=state.bookmarks?.[id];if(!b || b.deleted)return;const box=details('Bookmark',id),dl=el('dl');
+  field(dl,'Title',b.title);field(dl,'URL',b.source_url);field(dl,'Bookmarked',localTime(b.created_at));field(dl,'UTC',b.created_at);field(dl,'Bookmark ID',id);
+  box.append(dl,el('p','A bookmark stores a link. Save HTML, PDF or PNG to preserve the page contents. Later captures reflect the page at capture time.','muted'),bookmarkTools(b));
+  const copies=bookmarkCaptures(id);box.append(el('h3',`Saved copies (${copies.length})`));
+  for(const c of copies)box.append(button(c.evidence_number+' · '+c.capture_request+' · '+localTime(c.times.capture_started_at),()=>showCapture(c.capture_id),true));
+  box.append(button('Delete bookmark',async()=>{if(busy || bookmarkOperation)throw new Error('Wait for the current operation.');await canWrite();const c=context();if(c.caseId!==b.case_id)throw new Error('Open the bookmark’s original case first.');await exclusive(async()=>{const fresh=await loadState(c.root,c.workspace,c.caseId),record=fresh.bookmarks[id];if(!record || record.deleted)return;await append(c.root,c.workspace,c.caseId,'bookmark_deleted','bookmarks',{...record,deleted:true});});$('details').hidden=true;status('Bookmark removed. Saved evidence files are preserved.');await refresh({annotations:false});}));
+}
+action('bookmark-page',async()=>{
+  if(bookmarkOperation || busy)return;bookmarkOperation=true;busy=true;updateSetup();
+  try{const source=await currentTab();assertWebTab(source);await canWrite();const c=context(),record=await exclusive(()=>saveBookmark(c.root,c.workspace,c.caseId,source));await refresh({annotations:false});switchView('bookmarks');showBookmark(record.bookmark_id);status('Bookmark saved on disk. Page contents have not been captured.');}
+  finally{bookmarkOperation=false;busy=false;updateSetup();}
+});
+async function captureBookmark(bookmark,kind){
+  if(bookmarkOperation || busy)throw new Error('Wait for the current operation.');bookmarkOperation=true;busy=true;updateSetup();
+  try{
+    await canWrite();const c=context();if(c.caseId!==bookmark.case_id)throw new Error('Open the bookmark’s original case first.');
+    status('Opening bookmark. Waiting for the page to load…');
+    const window=await chrome.windows.getCurrent(),tabs=await chrome.tabs.query({windowId:window.id}),existing=tabs.find(t=>t.active && t.url===bookmark.source_url) || tabs.find(t=>t.url===bookmark.source_url),opened=existing?await chrome.tabs.update(existing.id,{active:true}):await chrome.tabs.create({windowId:window.id,url:bookmark.source_url,active:true}),deadline=performance.now()+30000;
+    let source;
+    while(performance.now()<deadline){source=await chrome.tabs.get(opened.id);if(source.status==='complete')break;await new Promise(resolve=>setTimeout(resolve,100));}
+    if(source?.status!=='complete')throw new Error('Page did not finish loading within 30 seconds. The bookmark is intact. Open it and try again.');
+    assertWebTab(source,preferences);if(c.root!==root || c.caseId!==activeCase)throw new Error('The active case changed. Try again in the original case.');
+    busy=false;
+    await runCapture(kind,{tabId:source.id,caseId:c.caseId,sourceUrl:source.url,bookmarkId:bookmark.bookmark_id});
+  }finally{bookmarkOperation=false;busy=false;updateSetup();renderList();}
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "Bookmark.schema.json",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "bookmark_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "source_url": {
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "title": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "time_context": {
+      "type": "object",
+      "properties": {
+        "timezone_id": {
+          "type": "string"
+        },
+        "local_offset_minutes": {
+          "type": "integer"
+        },
+        "clock_source": {
+          "const": "system_clock"
+        }
+      },
+      "required": [
+        "timezone_id",
+        "local_offset_minutes",
+        "clock_source"
+      ],
+      "additionalProperties": true
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "bookmark_id",
+    "case_id",
+    "source_url",
+    "title",
+    "created_at",
+    "time_context",
+    "deleted"
+  ],
+  "additionalProperties": true
+}

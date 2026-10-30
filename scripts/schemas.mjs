@@ -11,7 +11,10 @@ const schemas={
   EntityDraft:object({...common,entity_id:id,case_id:id,entity_type:{enum:['person','organization','phone','email','domain','ip_address','url','username','location','document','file','hash','custom']},label:str,raw_value:str,normalized_value:str,verification:{enum:['unconfirmed','verified','disputed']},confidence:{type:['number','null'],minimum:0,maximum:1},evidence_refs:array(id),created_at:timestamp,updated_at:timestamp,status:{enum:['unresolved']}}),
   EvidenceReference:object({...common,reference_id:id,case_id:id,source_url:{type:['string','null']},capture_id:nullableId,artifact_id:nullableId,quote:str,selection:{anyOf:[selector,{type:'null'}]},status:{enum:['archived','live_only']},observed_at:timestamp,attribution:{enum:['mentions','source_claims','analyst_inference']},verification:{enum:['unconfirmed','verified','disputed']}})
 };
+schemas.Bookmark=object({...common,bookmark_id:id,case_id:id,source_url:{type:'string',pattern:'^https?://'},title:str,created_at:timestamp,time_context:object({timezone_id:str,local_offset_minutes:{type:'integer'},clock_source:{const:'system_clock'}}),deleted:{type:'boolean'}});
+schemas.Capture.properties.bookmark_id=id;
 schemas.OSINTchartExport=object({...common,format:{const:'tracevault-osintchart'},exported_at:timestamp,case:object({schema_version:{const:1},case_id:id,title:str,code:str,created_at:timestamp}),entities:array({$ref:'EntityDraft.schema.json'}),evidence:array({$ref:'Capture.schema.json'}),evidence_refs:array({$ref:'EvidenceReference.schema.json'}),annotations:array({$ref:'Annotation.schema.json'}),artifacts:array(artifact),relations:array({type:'object'})});
+schemas.OSINTchartExport.properties.bookmarks=array({$ref:'Bookmark.schema.json'});
 await mkdir('schemas',{recursive:true});
 for(const [name,schema] of Object.entries(schemas))await writeFile(`schemas/${name}.schema.json`,JSON.stringify({$schema:'http://json-schema.org/draft-07/schema#',$id:`${name}.schema.json`,...schema},null,2)+'\n');
-console.log('Generated 5 JSON Schema contracts v1');
+console.log('Generated 6 JSON Schema contracts v1');

@@ -1,3 +1,12 @@
+## 0.8.0 — Bookmarks
+
+Actual installed Chrome screenshots at 320 × 900 px from the final passing disk-backed workflow:
+
+- [Light](0.8.0-bookmarks-light.png)
+- [Dark](0.8.0-bookmarks-dark.png)
+
+Inspected navigation alignment, five capture controls, bookmark row/actions, saved-copy count and horizontal bounds. These are extension UI screenshots, not a design mockup. Broader system DPI/OS picker coverage remains outside this iteration.
+
 # Реальные снимки интерфейса
 
 0.7.0: [manual comparison, light](0.7.0-comparison-light.png) / [dark](0.7.0-comparison-dark.png), [new-case destination and explicit stop choice](0.7.0-new-case-dialog.png), [fresh case without old stopped-session state](0.7.0-new-case-ready.png). Actual installed Chrome at 360px, real source files and verified comparison. The HTML-looking added text is deliberately rendered literally; offline/no-request and tamper checks are in TEST-REPORT.md.

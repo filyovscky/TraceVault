@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — 2026-10-30
+
+- Added case-local Bookmarks with duplicate prevention and disk journal persistence.
+- Added deferred HTML, raster PDF and full-page PNG capture, reusing a live matching tab where possible. Captures retain their bookmark ID.
+- Added bookmark details, saved-copy navigation and deletion that preserves evidence. Case JSON includes live bookmarks.
+- No new permissions or runtime dependencies.
+
 ## 0.7.0 — visits, manual comparison and independent new-case setup, 29.10.2026
 
 - Stop recording same-address History API replacements, title updates and anchor-only movement. Actual SPA address changes remain Page visited navigation records; document/back/reload visits stay supported. The investigation path defaults to visited pages; raw lifecycle/provenance remains inspectable and exportable. Existing evidence is untouched.

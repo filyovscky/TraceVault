@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {freezeSessionEvent,parseSessionEvent,sameSessionEvent} from '../extension/session-format.js';
 import {planTiles} from '../extension/screenshot.js';
 import {resourceCredentials} from '../extension/capture.js';
-import {casePath,listCases,createCase} from '../extension/repository.js';
+import {casePath,listCases,createCase,saveBookmark} from '../extension/repository.js';
 import {sha256,safePath,normalize,locateQuote,foldEvents,makeExport,assertWebTab,localTime,hostPattern,matchesDomain,recordUrls,citation,removeLegacyCaptureFilters} from '../extension/domain.js';
 
 test('shipped UI, manifest and runtime messages are English; archived content is external data',async()=>{for(const file of (await readdir('extension')).filter(f=>/\.(js|html|json)$/u.test(f)))assert.doesNotMatch(await readFile('extension/'+file,'utf8'),/[А-Яа-яЁё]/u,file);});
@@ -65,4 +65,16 @@ test('bounded text comparison preserves exact changed lines and discloses coarse
   assert.deepEqual(compareText('one\ntwo','one').rows,[{kind:'removed',text:'two'}]);
   assert.equal(compareText('a\nsame\nb','c\nsame\nd',1).method,'changed_region');
   assert.throws(()=>compareText(Array(12002).fill('line').join('\n'),''),/12000/u);
+});
+
+test('bookmark replay, case export and URL filters retain references independently of evidence',()=>{
+  const b={schema_version:1,bookmark_id:'b',case_id:'case',source_url:'https://example.org/path?q=1#fragment',title:'Reference',created_at:'2026-10-30T09:00:00.000Z',deleted:false};
+  const event={schema_version:1,sequence:1,record_type:'bookmarks',value:b},state=foldEvents([event]);
+  assert.deepEqual(recordUrls(b),[b.source_url]);assert.equal(makeExport(state,{case_id:'case'}).bookmarks[0].source_url,b.source_url);assert.equal(makeExport(state,{}).evidence.length,0);
+  const removed=foldEvents([event,{...event,sequence:2,value:{...b,deleted:true}}]);assert.equal(makeExport(removed,{}).bookmarks.length,0);assert.equal(removed.audit.length,2);assert.equal(b.deleted,false);
+});
+
+test('bookmarks reject executable and browser URLs before disk access',async()=>{
+  const root=new Proxy({},{get(){throw new Error('Unexpected disk access');}});
+  for(const url of ['javascript:alert(1)','chrome://extensions','file:///C:/secret','not-a-url'])await assert.rejects(saveBookmark(root,{mode:'workspace'},'case',{url}));
 });
